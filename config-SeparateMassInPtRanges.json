@@ -1,0 +1,21 @@
+{
+    "verbose": true,
+    "filename": "/home/andrea/MyMacros/Correlations_v2/triggered_data/AnalysisResults_LHC23_pass4.root",
+    "-filename": "/home/andrea/Downloads/AnalysisResults.root",
+
+    "dirname": "hf-correlator-d-meson-pairs",
+    "histname": "hMass",
+    "configMC": {
+        "isMC": false,
+        "histnameMcPrompt": "hMassMcRecPrompt",
+        "histnameMcNonPrompt": "hMassMcRecNonPrompt",
+        "histnameReflections" : "hMassMcRecReflections"
+    },
+    "nPtBins": 1,
+    "ptBinsEdges": [
+        2.0,
+        24.0
+    ],
+    "outputfile": "invMass_Data.root",
+    "outputdir": "/home/andrea/MyMacros/Correlations_v2/"
+}

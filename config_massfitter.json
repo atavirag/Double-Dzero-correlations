@@ -1,0 +1,200 @@
+{
+  "IsMC": false,
+  "_InFileName": "/home/andrea/MyMacros/Correlations/outputSparseProjection_SparseCorrelations_fixed_hopefully.root",
+  "_ReflFileName": "/home/andrea/MyMacros/Correlations/outputSparseProjection_SparseCorrelations_fixed_hopefully.root",
+  "_OutFileName": "/home/andrea/MyMacros/Correlations/rawYields_D0_correlations.root",
+  "InFileName": "/home/andrea/MyMacros/Correlations_v2/invMass_Data.root",
+  "ReflFileName": "/home/andrea/MyMacros/Correlations_v2/invMass_MC4Correlations.root",
+  "OutFileName": "/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_LHC23_pass4.root",
+
+  "InputHistoName": [
+    "pT0"
+  ],
+  "_InputHistoName": [
+    "pos0/InvMassData/InvMassData_1.0_2.0", "pos0/InvMassData/InvMassData_2.0_3.0", "pos0/InvMassData/InvMassData_3.0_4.0",
+    "pos0/InvMassData/InvMassData_4.0_5.0", "pos0/InvMassData/InvMassData_5.0_6.0", "pos0/InvMassData/InvMassData_6.0_8.0",
+    "pos0/InvMassData/InvMassData_8.0_12.0", "pos0/InvMassData/InvMassData_12.0_16.0", "pos0/InvMassData/InvMassData_16.0_24.0"
+  ],
+
+  "_PromptHistoName": [
+    "pos0/InvMassMcPrompt/InvMassMcPrompt_1.0_2.0", "pos0/InvMassMcPrompt/InvMassMcPrompt_2.0_3.0", "pos0/InvMassMcPrompt/InvMassMcPrompt_3.0_4.0",
+    "pos0/InvMassMcPrompt/InvMassMcPrompt_4.0_5.0", "pos0/InvMassMcPrompt/InvMassMcPrompt_5.0_6.0", "pos0/InvMassMcPrompt/InvMassMcPrompt_6.0_8.0",
+    "pos0/InvMassMcPrompt/InvMassMcPrompt_8.0_12.0", "pos0/InvMassMcPrompt/InvMassMcPrompt_12.0_16.0", "pos0/InvMassMcPrompt/InvMassMcPrompt_16.0_24.0"
+  ],
+  "PromptHistoName": [
+    "pT0MassPrompt"
+  ],
+  "_FDHistoName": [
+    "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_1.0_2.0", "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_2.0_3.0", "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_3.0_4.0",
+    "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_4.0_5.0", "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_5.0_6.0", "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_6.0_8.0",
+    "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_8.0_12.0", "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_12.0_16.0", "pos0/InvMassMcNonPrompt/InvMassMcNonPrompt_16.0_24.0"
+  ],
+  "FDHistoName": [
+    "pT0MassNonPrompt"
+  ],
+  "_ReflHistoName": [
+    "pos0/Reflections/InvMassRefl_1.0_2.0", "pos0/Reflections/InvMassRefl_2.0_3.0", "pos0/Reflections/InvMassRefl_3.0_4.0",
+    "pos0/Reflections/InvMassRefl_4.0_5.0", "pos0/Reflections/InvMassRefl_5.0_6.0", "pos0/Reflections/InvMassRefl_6.0_8.0",
+    "pos0/Reflections/InvMassRefl_8.0_12.0", "pos0/Reflections/InvMassRefl_12.0_16.0", "pos0/Reflections/InvMassRefl_16.0_24.0"
+  ],
+  "ReflHistoName": [
+    "pT0ReflMass"
+  ],
+  "PromptSecPeakHistoName": [
+  ],
+  "FDSecPeakHistoName": [
+  ],
+  "Particle": "D0",
+  "_Particles": [
+    "Dplus",
+    "Ds",
+    "LcToPKPi",
+    "LcToPK0s",
+    "Dstar"
+  ],
+  "reflectionType": "All",
+  "_reflectionTypes": [
+    "All",
+    "Prompt",
+    "FD"
+  ],
+  "EnableRefl": true,
+  "FixSigma": false,
+  "SigmaFile": "",
+  "_SigmaFile": "fix sigma from file",
+  "FixSigmaManual": [
+    0.0148,
+    0.0173,
+    0.0199,
+    0.0229,
+    0.0254,
+    0.0276,
+    0.0335,
+    0.0378,
+    0.0390
+  ],
+
+  "_FixSigmaManual": "fix sigma mannually",
+  "FixMean": false,
+  "MeanFile": "",
+  "_MeanFile": "fix mean from file",
+  "_PtMin": [
+    1.0,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    8.0,
+    12.0,
+    16.0
+  ],
+  "PtMin": [
+    2.0
+  ],
+
+  "_PtMax": [
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    8.0,
+    12.0,
+    16.0,
+    24.0
+  ],
+  "PtMax": [
+    24.0
+  ],
+
+  "_MassMin": [
+    1.74,
+    1.73,
+    1.73,
+    1.72,
+    1.72,
+    1.72,
+    1.7,
+    1.7,
+    1.7
+  ],
+  "MassMin": [
+    1.7
+  ],
+
+  "_MassMax": [
+    2.02,
+    2.02,
+    2.02,
+    2.03,
+    2.05,
+    2.05,
+    2.05,
+    2.05,
+    2.05
+  ],
+  "MassMax": [
+    2.05
+  ],
+
+  "_Rebin": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "Rebin": [
+    1
+  ],
+  "InclSecPeak": false,
+  "SigmaSecPeak": "",
+  "SigmaFileSecPeak": "",
+  "SigmaMultFactorSecPeak": 1.0,
+  "FixSigmaToFirstPeak": false,
+  "UseLikelihood": false,
+  "_UseLikelihood": [
+    "true: likelihood fit",
+    "false: chi2 fit"
+  ],
+  "_BkgFunc": [
+    5, 5, 5, 5, 5, 5, 0,0, 0
+  ],
+  "BkgFunc": [
+    0
+  ],
+
+  "_BkgFuncs": [
+    "0 for Expo",
+    "1 for Poly1",
+    "2 for Poly2",
+    "3 for Pow",
+    "4 for PowEx",
+    "5 for Poly3",
+    "6 for ExpoGauss",
+    "7 for NoBkg"
+  ],
+  "_SgnFunc": [
+    0, 0, 0, 0, 0, 0, 0, 0, 0
+  ],
+  "SgnFunc": [
+    0
+  ],
+
+  "_SgnFuncs": [
+    "0 for SingleGaus",
+    "1 for DoubleGaus",
+    "2 for DoubleGausSigmaRatioPar",
+    "3 for GausSec"
+  ],
+  "BoundMean": true,
+  "_BoundMean": [
+    "false: Do not set limits on mean range",
+    "true: the mean is set to be between MassMin[i] and MassMax[i]"
+  ]
+}

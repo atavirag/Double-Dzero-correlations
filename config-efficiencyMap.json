@@ -1,0 +1,40 @@
+{
+    "verbose": true,
+    "debug": false,
+
+    "files": {
+        "filenameRecoPrompt": "/home/andrea/MyMacros/Correlations_v2/AnalysisResults_MC_TOFFixed.root",
+        "filenameRecoNonPrompt": "/home/andrea/MyMacros/Correlations_v2/AnalysisResults_MC_TOFFixed.root",
+        "filenameGenPrompt": "/home/andrea/MyMacros/Correlations_v2/AnalysisResults_MC_TOFFixed.root",
+        "filenameGenNonPrompt": "/home/andrea/MyMacros/Correlations_v2/AnalysisResults_MC_TOFFixed.root"
+    },
+
+    "histos": {
+        "hPromptName": "hPtVsYRecSigPromptReco",
+        "hNonPromptName": "hPtVsYRecSigNonPromptReco",
+        "hAllName": "hPtVsYRecSigReco"
+    },
+
+    "parameters": {
+        "ptBinsEdges": [
+            0.0,
+            1.0,
+            1.5,
+            2.0,
+            2.5,
+            3.0,
+            3.5,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            12.0,
+            16.0,
+            24.0
+        ],
+        "nPositions": 1
+    },
+    "isLog_eff": true,
+    "outputDir": "/home/andrea/MyMacros/Correlations_v2/"
+}

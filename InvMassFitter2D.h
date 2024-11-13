@@ -31,17 +31,19 @@ class InvMassFitter2D {
         // Member functions
         void createDataset();
         void fillDataset(RooDataSet &data, RooArgSet &vars);
-        void set1DParameters(const RooArgSet* vars1D, double const& reflOverSgn);
+        void set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency);
         void setLumi(double const& lumi);
         void setPtLims(double const& ptMin, double const& ptMax);
         void setMassLims(double const& massMin, double const& massMax);
         void fillWorkspace(RooDataSet *dataset);
         void setEfficiencyMap(TH2F *h);
         double calculateWeights(double const& y, double const& pt);
-        double calculateIntegratedEfficiency();
+        void checkCorrelations(RooDataSet &data);
+        //double calculateIntegratedEfficiency();
         void do2DFit(Bool_t draw, Bool_t doReflections, TFile *fout);
-        void plotProjectionsAfterFit(RooAddPdf *model, RooDataSet *dataset, TString saveName, TFile *fout, bool doReflections);
-        void plot2DFit(TH2D *hMassCorrelations, TH2D* histFit, RooAddPdf *model, Bool_t draw, TFile *fout, TString const& cName);
+        void plotProjectionsAfterFit(RooProdPdf *model, RooDataSet *dataset, TString saveName, TFile *fout, bool doReflections);
+        void plot2DFit(TH2D *hMassCorrelations, TH2D* histFit, RooProdPdf *model, Bool_t draw, TFile *fout, TString const& cName);
+        RooRealVar *getYieldInRange(RooFitResult *fitResult, RooRealVar *massCand1, RooRealVar *massCand2, RooProdPdf function, RooFormulaVar nCands, TString range);
 
     private:
         // Member variables
@@ -72,6 +74,7 @@ class InvMassFitter2D {
         RooRealVar* _sigmaReflDoubleGaus;
         RooRealVar* _rawYield;
         double _reflOverSgn = 0.;
+        double _integratedEfficiency = 0.;
         TH2F *_efficiencyMap;
 
         RooRealVar rooPtCand1;

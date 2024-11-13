@@ -57,14 +57,18 @@ void runInvMassFitter2D() {
     // load 1D fit results
     //TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_cut2GeV.root", "read");
     //TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_LHC24.root", "read");
-    TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_LHC23_pass4.root", "read");
+    TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_LHC23_pass4_1GeV.root", "read");
     TH1F *hReflOverSgn = (TH1F *)file1DFit->Get("hReflectionOverSignal");
     double reflOverSgn = hReflOverSgn->GetBinContent(1);
     cout << "Reflection over signal: " << reflOverSgn << endl;
 
+    TFile *fileEffInt = TFile::Open("/home/andrea/MyMacros/Correlations_v2/AccEffPreselD0ToKPi_correlations_integrated.root", "read");
+    TH1F *hEffInt = (TH1F *)fileEffInt->Get("hAccEffPreselD0ToKPi_pos0All");
+    double integratedEff = hEffInt->GetBinContent(1);
+
     //TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_v2/workspace_massFitter_cut2GeV.root", "read");
     //TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_v2/workspace_massFitter_LHC24.root", "read");
-    TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_v2/workspace_massFitter_triggeredData_LHC23.root", "read");
+    TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_v2/workspace_massFitter_cut1GeV.root", "read");
     if (!fileWorkspace || fileWorkspace->IsZombie()) {
         std::cerr << "Error opening workspace file!" << std::endl;
         return;
@@ -84,14 +88,15 @@ void runInvMassFitter2D() {
     InvMassFitter2D fitterOS(tree, "OS");
     cout << "fitter objects created and tree data loaded" << endl;
 
-    TH2F *hEffMap = dynamic_cast<TH2F *>(fEfficiencies->Get("hEfficiencyMapAll"));
+    //TH2F *hEffMap = dynamic_cast<TH2F *>(fEfficiencies->Get("hEfficiencyMapAll"));
+    TH2F *hEffMap = dynamic_cast<TH2F *>(fEfficiencies->Get("reducedEfficiencyMap"));
     if (!hEffMap) {
-        std::cerr << "Error: Histogram 'hEfficiencyMapAll' not found or not a TH2F." << std::endl;
+        std::cerr << "Error: Histogram 'reducedEfficiencyMap' not found or not a TH2F." << std::endl;
         return;
     }
 
-    fitterLS.setPtLims(2., 24.);
-    fitterOS.setPtLims(2., 24.);
+    fitterLS.setPtLims(1., 24.);
+    fitterOS.setPtLims(1., 24.);
 
     fitterLS.setLumi(LumiTVX);
     fitterOS.setLumi(LumiTVX);
@@ -99,8 +104,8 @@ void runInvMassFitter2D() {
     fitterLS.setMassLims(1.7, 2.05);
     fitterOS.setMassLims(1.7, 2.05);
 
-    fitterLS.set1DParameters(varsSaved, reflOverSgn);
-    fitterOS.set1DParameters(varsSaved, reflOverSgn);
+    fitterLS.set1DParameters(varsSaved, reflOverSgn, integratedEff);
+    fitterOS.set1DParameters(varsSaved, reflOverSgn, integratedEff);
 
     fitterLS.setEfficiencyMap(hEffMap);
     fitterOS.setEfficiencyMap(hEffMap);

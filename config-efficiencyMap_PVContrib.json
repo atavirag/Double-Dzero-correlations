@@ -1,0 +1,17 @@
+{
+    "verbose": true,
+    "debug": true,
+
+    "files": {
+        "filenameGen": "/home/andrea/MyMacros/O2Developments/AnalysisResults.root",
+        "filenameReco": "/home/andrea/MyMacros/O2Developments/AnalysisResults.root"
+    },
+
+    "histos": {
+        "hNameReco": "hPtVsYVsNContribMcRec",
+        "hNameGen": "hPtVsYVsNContribMcGen"
+    },
+
+    "isLog_eff": true,
+    "outputDir": "/home/andrea/MyMacros/Correlations_v2/"
+}

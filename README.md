@@ -3,10 +3,19 @@ Macros and instructions to run the double D⁰ correlations analysis. More info 
 
 ## Ingredients
 - **AnalysisResults.root** files containing the results of task-d0 and correlator-d-meson-pairs for data and MC.
-- **AO2D.root** file containing o2d0pair tree (data) and also O2d0pairmcinfo (MC).
+- **AO2D.root** file containing o2d0pair tree (data)).
+
+## Datasets
+This analysis has to be run using the double-charm triggered datasets. As of now (December 2024), there are two main triggered datasets:
+-  HF_LHC23_pass4_skimmed_2P3PDstar_TriggerHfFemtoDoubleCharm, and
+-  HF_LHC24_pass1_skimmed_2P3PDstar_TriggerHfFemtoDoubleCharm
+
+The final analysis will most likely be performed using the latter since it contains about 10 times more stats.
+In order to run these types of datasets, a few things must be taken into account, which can be checked in this presentation: https://indico.cern.ch/event/1472841/contributions/6200871/attachments/2960064/5205975/hftrigger_report_PWGHF.pdf.
 
 ## BDT trainings
-TODO: add info about trainings here
+This analysis was performed by stacking two BDTs on top of each other. The first one is the one that was used to create the triggered dataset, and the second one was trained using the output of the first one as input.
+TODO: explain, explain
 
 ## Analysis steps
 

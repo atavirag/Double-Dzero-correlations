@@ -5,6 +5,7 @@
 #define INVMASSFITTER2D_H
 
 #include "TTree.h"
+#include "Math/Vector4D.h"
 #include "RooRealVar.h"
 #include "RooDataSet.h"
 #include "RooGaussian.h"
@@ -31,19 +32,29 @@ class InvMassFitter2D {
         // Member functions
         void createDataset();
         void fillDataset(RooDataSet &data, RooArgSet &vars);
+        void fillWorkspace(RooDataSet *dataset);
+        // Functions to set parameters manually
         void set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency);
         void setLumi(double const& lumi);
         void setPtLims(double const& ptMin, double const& ptMax);
         void setMassLims(double const& massMin, double const& massMax);
-        void fillWorkspace(RooDataSet *dataset);
+        void setSgnFunc(TString const& sgnFunc);
+        void setBkgFunc(TString  const& bkgFunc);
+        void setReflFunc(TString  const& reflFunc);
         void setEfficiencyMap(TH2F *h);
+        // Functions for checks and calculations
         double calculateWeights(double const& y, double const& pt);
-        void checkCorrelations(RooDataSet &data);
+        void analyseKinematicDistributions(TFile *fout);
         //double calculateIntegratedEfficiency();
-        void do2DFit(Bool_t draw, Bool_t doReflections, TFile *fout);
+        ROOT::Math::PxPyPzMVector createLorentzVector(double const& phi, double const& y, double const& pt, double const& m);
+        RooRealVar *getYieldInRange(RooFitResult *fitResult, RooRealVar *massCand1, RooRealVar *massCand2, RooProdPdf function, RooFormulaVar nCands, TString range);
+        // Fitting and plotting functions
+        void do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TFile *fout);
         void plotProjectionsAfterFit(RooProdPdf *model, RooDataSet *dataset, TString saveName, TFile *fout, bool doReflections);
         void plot2DFit(TH2D *hMassCorrelations, TH2D* histFit, RooProdPdf *model, Bool_t draw, TFile *fout, TString const& cName);
-        RooRealVar *getYieldInRange(RooFitResult *fitResult, RooRealVar *massCand1, RooRealVar *massCand2, RooProdPdf function, RooFormulaVar nCands, TString range);
+        void plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult, const char* title, const char* canvasName);
+        void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, int const& candNum, TString physVar);
+        void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, TString physVar);
 
     private:
         // Member variables
@@ -63,6 +74,9 @@ class InvMassFitter2D {
         int _typeOfBkgPdf;
         int _typeOfSgnPdf;
         int _typeOfReflPdf;
+        TString _sgnFuncOption;
+        TString _bkgFuncOption;
+        TString _reflFuncOption;
 
         RooRealVar* _tau;
         RooRealVar* _mean;

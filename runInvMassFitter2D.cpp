@@ -22,21 +22,21 @@ using std::cout;
 using std::endl;
 
 void runInvMassFitter2D() {
-    //const char *fname = "~/MyMacros/Correlations/AO2D/AO2D_highIR.root";
-    //const char *fname = "~/MyMacros/Correlations_v2/triggered_data/AO2D_LHC24_pass1.root";
-    const char *fname = "~/MyMacros/Correlations_v2/triggered_data/AO2D_LHC23_pass4.root";
+    const char *fname =  "~/MyMacros/Correlations_v2/triggered_data/AO2D_Data_Full2024.root";
+    //const char *fname =  "~/MyMacros/Correlations_github/AO2D_MC_noAmbiguous.root";
 
     TFile *file = TFile::Open(fname, "read");
-    TFile *foutLS = TFile::Open("test_LS_triggered_LHC23_pass4.root", "RECREATE");
-    TFile *foutOS = TFile::Open("test_OS_triggered_LHC23_pass4.root", "RECREATE");
-    TFile *fEfficiencies = TFile::Open("Eff_times_Acc_Map.root", "read");
+    TFile *foutLS = TFile::Open("test_LS_MC_no_ambiguous.root", "RECREATE");
+    TFile *foutOS = TFile::Open("test_OS_MC_no_ambiguous.root", "RECREATE");
+    TFile *fEfficiencies = TFile::Open("~/MyMacros/Correlations_v2/Eff_times_Acc_Map_weighted.root", "read");
 
     if (!file) {
         cout << ">> ERROR File not well readout" << endl;
         return;
     }
 
-    TFile *fAnaRes = TFile::Open("~/MyMacros/Correlations_v2/triggered_data/AnalysisResults_LHC23_pass4.root");
+    //TFile *fAnaRes = TFile::Open("~/MyMacros/Correlations_github/AnalysisResults_LHC23_pass4.root");
+    TFile *fAnaRes = TFile::Open("~/MyMacros/Correlations_v2/triggered_data/AnalysisResults_Data_Full2024.root");
 
     TString dirnameBcCount = "bc-selection-task";
     TDirectory *dirBcData = (TDirectory *)fAnaRes->Get(dirnameBcCount);
@@ -44,9 +44,8 @@ void runInvMassFitter2D() {
     cout << "Number of TVX entries: " << hCounterTVX->GetEntries() << endl;
     float const LumiTVX = hCounterTVX->GetEntries()/(59.4*1000);    //  micro b^-1
 
-    //TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2261906152687232"); // AO2D_highIR.root
-    //TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2363808317917888"); // AO2D_LHC24.root
-    TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2298103932356800"); // AO2D_LHC24.root
+    TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2372467354599136"); // AO2D_Data_Full2024.root
+    //TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2364937873171829"); // AO2D_MC_no_ambiguous.root
 
     TTree *tree = (TTree *)dir->Get("O2d0pair");
     if (!tree) {
@@ -55,20 +54,19 @@ void runInvMassFitter2D() {
     }
 
     // load 1D fit results
-    //TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_cut2GeV.root", "read");
-    //TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_LHC24.root", "read");
-    TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_D0_correlations_fromTree_LHC23_pass4_1GeV.root", "read");
+    TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_github/rawYields_LHC23_pass4.root", "read");
+    //TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_LHC24_full_pt23.root", "read");
     TH1F *hReflOverSgn = (TH1F *)file1DFit->Get("hReflectionOverSignal");
-    double reflOverSgn = hReflOverSgn->GetBinContent(1);
+    //double reflOverSgn = hReflOverSgn->GetBinContent(1);
+    double reflOverSgn = 0.0;
     cout << "Reflection over signal: " << reflOverSgn << endl;
 
-    TFile *fileEffInt = TFile::Open("/home/andrea/MyMacros/Correlations_v2/AccEffPreselD0ToKPi_correlations_integrated.root", "read");
-    TH1F *hEffInt = (TH1F *)fileEffInt->Get("hAccEffPreselD0ToKPi_pos0All");
+    TFile *fileEffInt = TFile::Open("/home/andrea/MyMacros/Common/AccEffPreselD0ToKPi_k3_SecondBDT_ptIntegrated.root", "read");
+    TH1F *hEffInt = (TH1F *)fileEffInt->Get("hAccEffPreselD0ToKPi_k3_SecondBDT_ptIntegratedAll");
     double integratedEff = hEffInt->GetBinContent(1);
 
-    //TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_v2/workspace_massFitter_cut2GeV.root", "read");
-    //TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_v2/workspace_massFitter_LHC24.root", "read");
-    TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_v2/workspace_massFitter_cut1GeV.root", "read");
+    //TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_github/workspace_massFitter_LHC23_pass4.root", "read");
+    TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_github/workspace_massFitter_full2024.root", "read");
     if (!fileWorkspace || fileWorkspace->IsZombie()) {
         std::cerr << "Error opening workspace file!" << std::endl;
         return;
@@ -84,6 +82,33 @@ void runInvMassFitter2D() {
     // Get all variables in the workspace
     const RooArgSet* varsSaved = dataSaved->get();
 
+    if (dataSaved && varsSaved)
+    {
+        // Loop over all variables in the dataset
+        RooFIter iter = varsSaved->fwdIterator();
+        RooAbsArg *var = nullptr;
+
+        while ((var = iter.next()))
+        {
+            // Cast to RooRealVar to access value, if applicable
+            RooRealVar *realVar = dynamic_cast<RooRealVar *>(var);
+            if (realVar)
+            {
+                std::cout << "Variable: " << realVar->GetName()
+                          << ", Value: " << realVar->getVal() << std::endl;
+            }
+            else
+            {
+                std::cout << "Variable: " << var->GetName()
+                          << " is not a RooRealVar." << std::endl;
+            }
+        }
+    }
+    else
+    {
+        std::cerr << "Data or variables set is null!" << std::endl;
+    }
+
     InvMassFitter2D fitterLS(tree, "LS");
     InvMassFitter2D fitterOS(tree, "OS");
     cout << "fitter objects created and tree data loaded" << endl;
@@ -95,14 +120,28 @@ void runInvMassFitter2D() {
         return;
     }
 
-    fitterLS.setPtLims(1., 24.);
-    fitterOS.setPtLims(1., 24.);
+    fitterLS.setPtLims(1., 10.);
+    fitterOS.setPtLims(1., 10.);
 
     fitterLS.setLumi(LumiTVX);
     fitterOS.setLumi(LumiTVX);
 
-    fitterLS.setMassLims(1.7, 2.05);
-    fitterOS.setMassLims(1.7, 2.05);
+    //fitterLS.setMassLims(1.8, 1.95);
+    //fitterOS.setMassLims(1.8, 1.95);
+    fitterLS.setMassLims(1.73, 2.05);
+    fitterOS.setMassLims(1.73, 2.05);
+
+    // Set signal function for fit: gaus, CB
+    // Both work fine for data, but for MC CB works significantly better
+    fitterLS.setSgnFunc("gaus");
+    fitterOS.setSgnFunc("gaus");
+    // Set background function for fit: expo, poly1, poly2, poly3
+    fitterLS.setBkgFunc("poly3");
+    fitterOS.setBkgFunc("poly3");
+    // Set reflection function for fit: gaus, doubleGaus
+    fitterLS.setReflFunc("gaus");
+    fitterOS.setReflFunc("gaus");
+
 
     fitterLS.set1DParameters(varsSaved, reflOverSgn, integratedEff);
     fitterOS.set1DParameters(varsSaved, reflOverSgn, integratedEff);
@@ -110,8 +149,9 @@ void runInvMassFitter2D() {
     fitterLS.setEfficiencyMap(hEffMap);
     fitterOS.setEfficiencyMap(hEffMap);
 
-    fitterLS.do2DFit(true, true, foutLS);
-    fitterOS.do2DFit(true, true, foutOS);
+    // do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TFile *fout);
+    fitterLS.do2DFit(true, false, false, foutLS);
+    fitterOS.do2DFit(true, false, false, foutOS);
 
     cout << "Programa terminado" << endl;
 

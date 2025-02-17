@@ -11,7 +11,7 @@
 using std::cout;
 using std::endl;
 
-bool verbose = false;
+bool verbose = true;
 
 struct HistogramValues {
     double analysedTriggersValue;
@@ -53,18 +53,16 @@ void computeLumiTriggered() {
                     // If it's a histogram, process it
                     TH1* hist = (TH1*)obj;
 
-                    if (std::string(hist->GetName()) == "AnalysedTriggersOfInterest") {
-                        values.analysedTriggersValue = hist->GetBinContent(1);
+                    if (std::string(hist->GetName()) == "AnalysedTriggers") {
+                        int binAnalysedTriggers = hist->GetXaxis()->FindBin("fHfDoubleCharm2P");
+                        values.analysedTriggersValue = hist->GetBinContent(binAnalysedTriggers);
+                        //values.analysedTriggersValue = hist->Integral();
                     } else if (std::string(hist->GetName()) == "InspectedTVX") {
-                        values.inspectedTVXValue = hist->GetBinContent(1);
-                    } else if (std::string(hist->GetName()) == "Scalers") {
-                        const char* triggerLabel = "fHfDoubleCharm2P";
-                        int bin = hist->GetXaxis()->FindBin(triggerLabel);
-                        if (bin > 0 && bin <= hist->GetNbinsX()) {
-                            values.scalerValue = hist->GetBinContent(bin);
-                        } else {
-                            std::cout << ">> ERROR: Label '" << triggerLabel << "' not found in Scalers histogram" << std::endl;
-                        }
+                        values.inspectedTVXValue = hist->Integral();
+                    } else if (std::string(hist->GetName()) == "Selections") {
+                        //int bin = hist->GetNbinsX(); // the last bin contains the triggered events
+                        int bin = hist->GetXaxis()->FindBin("fHfDoubleCharm2P"); // the last bin contains the triggered events
+                        values.scalerValue = hist->GetBinContent(bin);
                     }
                 }
             }
@@ -78,27 +76,39 @@ void computeLumiTriggered() {
     // Start processing from the root directory
     processDir(dir, "");
 
-    // Example: Print out stored values
+    double totAnalysedTriggers = 0.;
+    double totScalers = 0.;
+    double totInspectedTVX = 0.;
     double totNev = 0.;
     for (const auto& [dirPath, values] : directoryValues) {
 
-        double nEvents = values.inspectedTVXValue * (values.analysedTriggersValue / values.scalerValue);
-        totNev += nEvents;
+        double nEvents = (values.inspectedTVXValue * values.analysedTriggersValue) / values.scalerValue;
+        //totNev += nEvents;
+
+        totAnalysedTriggers += values.analysedTriggersValue;
+        totScalers += values.scalerValue;
+        totInspectedTVX += values.inspectedTVXValue;
 
         if (verbose) {
             std::cout << "Directory: " << dirPath << std::endl;
             std::cout << "  AnalysedTriggersOfInterest: " << values.analysedTriggersValue << std::endl;
             std::cout << "  InspectedTVX: " << values.inspectedTVXValue << std::endl;
-            std::cout << "  Scalers[fHfDoubleCharm2P]: " << values.scalerValue << std::endl;
+            std::cout << "  Selections (DoubleCharm): " << values.scalerValue << std::endl;
             std::cout << "  Number of events: " << nEvents << std::endl;
         }
     }
+
+    totNev = totInspectedTVX * totAnalysedTriggers / totScalers;
 
     // TVX cross-section
     float xSecTVX = 59.4; // mb
     // Integrated luminosity TVX = Nevents / xSecTVX
     double lumi = totNev / (xSecTVX * pow(10.,9)); // pb⁻1
     if (verbose) {
+        std::cout << "  Total AnalysedTriggersOfInterest: " << totAnalysedTriggers << std::endl;
+        std::cout << "  Total InspectedTVX: " << totInspectedTVX << std::endl;
+        std::cout << "  Total Selections (DoubleCharm): " << totScalers << std::endl;
+
         std::cout << "  Integrated Luminosity TVX BEFORE BC CORRECTION: " << lumi << std::endl;
     }
 

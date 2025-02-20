@@ -12,7 +12,7 @@ import sys
 import numpy as np  # pylint: disable=import-error
 import ROOT  # pylint: disable=import-error
 sys.path.insert(0, '..')
-from utils.style_formatter import set_global_style, set_object_style
+from style_formatter import set_global_style, set_object_style
 
 
 # pylint: disable=too-many-instance-attributes

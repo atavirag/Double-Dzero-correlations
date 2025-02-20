@@ -48,6 +48,7 @@ def main(config):
     if cfg["central_efficiency"]["computerawfrac"]:
         infile_name = os.path.join(cfg["central_efficiency"]["inputdir"], cfg["central_efficiency"]["inputfile"])
         infile_central_eff = ROOT.TFile.Open(infile_name)
+        infile_central_eff.ls()  # Lists all objects in the file
         hist_central_effp = infile_central_eff.Get(cfg["central_efficiency"]["histonames"]["prompt"])
         hist_central_effnp = infile_central_eff.Get(cfg["central_efficiency"]["histonames"]["nonprompt"])
         hist_central_effp.SetDirectory(0)

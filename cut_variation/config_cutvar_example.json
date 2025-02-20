@@ -1,57 +1,47 @@
 {
     "rawyields": {
-        "inputdir": "path/to/RawYields/files",
+        "inputdir": "/home/andrea/MyMacros/Cut_variation_for_correlations/FDScan/",
         "inputfiles": [
-            "RawYieldsDplus_outFD_pos10.root",
-            "RawYieldsDplus_outFD_pos11.root",
-            "RawYieldsDplus_outFD_pos12.root",
-            "RawYieldsDplus_outFD_pos13.root",
-            "RawYieldsDplus_outFD_pos14.root",
-            "RawYieldsDplus_outFD_pos15.root",
-            "RawYieldsDplus_outFD_pos16.root",
-            "RawYieldsDplus_outFD_pos17.root",
-            "RawYieldsDplus_outFD_pos18.root",
-            "RawYieldsDplus_outFD_pos19.root",
-            "RawYieldsDplus_outFD_pos20.root",
-            "RawYieldsDplus_outFD_pos21.root",
-            "RawYieldsDplus_outFD_pos22.root",
-            "RawYieldsDplus_outFD_pos23.root",
-            "RawYieldsDplus_outFD_pos24.root",
-            "RawYieldsDplus_outFD_pos25.root",
-            "RawYieldsDplus_outFD_pos26.root",
-            "RawYieldsDplus_outFD_pos27.root",
-            "RawYieldsDplus_outFD_pos28.root",
-            "RawYieldsDplus_outFD_pos29.root"
+            "rawYield_Pos001.root",
+            "rawYield_Pos002.root",
+            "rawYield_Pos003.root",
+            "rawYield_Pos004.root",
+            "rawYield_Pos005.root",
+            "rawYield_Pos006.root",
+            "rawYield_Pos007.root",
+            "rawYield_Pos008.root",
+            "rawYield_Pos009.root",
+            "rawYield_Pos010.root",
+            "rawYield_Pos011.root",
+            "rawYield_Pos012.root",
+            "rawYield_Pos013.root",
+            "rawYield_Pos014.root",
+            "rawYield_Pos015.root"
         ],
         "histoname": "hRawYields"
     },
     "efficiencies": {
-        "inputdir": "path/to/efficiencies/files",
+        "inputdir": "/home/andrea/MyMacros/Cut_variation_for_correlations/Efficiencies/",
         "inputfiles": [
-            "Eff_times_Acc_Dplus_outFD_pos10.root",
-            "Eff_times_Acc_Dplus_outFD_pos11.root",
-            "Eff_times_Acc_Dplus_outFD_pos12.root",
-            "Eff_times_Acc_Dplus_outFD_pos13.root",
-            "Eff_times_Acc_Dplus_outFD_pos14.root",
-            "Eff_times_Acc_Dplus_outFD_pos15.root",
-            "Eff_times_Acc_Dplus_outFD_pos16.root",
-            "Eff_times_Acc_Dplus_outFD_pos17.root",
-            "Eff_times_Acc_Dplus_outFD_pos18.root",
-            "Eff_times_Acc_Dplus_outFD_pos19.root",
-            "Eff_times_Acc_Dplus_outFD_pos20.root",
-            "Eff_times_Acc_Dplus_outFD_pos21.root",
-            "Eff_times_Acc_Dplus_outFD_pos22.root",
-            "Eff_times_Acc_Dplus_outFD_pos23.root",
-            "Eff_times_Acc_Dplus_outFD_pos24.root",
-            "Eff_times_Acc_Dplus_outFD_pos25.root",
-            "Eff_times_Acc_Dplus_outFD_pos26.root",
-            "Eff_times_Acc_Dplus_outFD_pos27.root",
-            "Eff_times_Acc_Dplus_outFD_pos28.root",
-            "Eff_times_Acc_Dplus_outFD_pos29.root"
+            "Eff_times_Acc_pos1.root",
+            "Eff_times_Acc_pos2.root",
+            "Eff_times_Acc_pos3.root",
+            "Eff_times_Acc_pos4.root",
+            "Eff_times_Acc_pos5.root",
+            "Eff_times_Acc_pos6.root",
+            "Eff_times_Acc_pos7.root",
+            "Eff_times_Acc_pos8.root",
+            "Eff_times_Acc_pos9.root",
+            "Eff_times_Acc_pos10.root",
+            "Eff_times_Acc_pos11.root",
+            "Eff_times_Acc_pos12.root",
+            "Eff_times_Acc_pos13.root",
+            "Eff_times_Acc_pos14.root",
+            "Eff_times_Acc_pos15.root"
         ],
         "histonames": {
-            "prompt": "hAccEffPrompt",
-            "nonprompt": "hAccEffFD"
+            "prompt": "hEffPrompt",
+            "nonprompt": "hEffNonPrompt"
         }
     },
     "minimisation": {
@@ -59,15 +49,15 @@
     },
     "central_efficiency": {
         "computerawfrac": true,
-        "inputdir": "path/to/central/efficiency",
-        "inputfile": "efficiency.root",
+        "inputdir": "~/MyMacros/Common/",
+        "inputfile": "AccEffPreselD0ToKPi_With_ambiguous_bothBDTs.root",
         "histonames": {
-            "prompt": "hAccEffPrompt",
-            "nonprompt": "hAccEffFD"
+            "prompt": "hAccEffPreselD0ToKPi_With_ambiguous_bothBDTsPrompt",
+            "nonprompt": "hAccEffPreselD0ToKPi_With_ambiguous_bothBDTsNonprompt"
         }
     },
     "output": {
         "directory": ".",
-        "file": "CutVarDplus_pp13TeV_MB.root"
+        "file": "CutVarDplus_2024_triggered.root"
     }
 }

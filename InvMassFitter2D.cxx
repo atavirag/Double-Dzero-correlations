@@ -43,6 +43,8 @@ InvMassFitter2D::InvMassFitter2D() : _tree(nullptr), _pairType("OS"), nentries(0
                                      rooMCand2("fMCand2", "invariant-mass of the second candidate", 1.70, 2.05),
                                      rooYCand1("fYCand1", "y of candidate 1", -1., 1.),
                                      rooYCand2("fYCand2", "y of candidate 2", -1., 1.),
+                                     rooPhiCand1("fPhiCand1", "phi of candidate 1", -3.5, 3.5),
+                                     rooPhiCand2("fPhiCand2", "phi of candidate 2", -3.5, 3.5),
                                      _efficiencyMap(0x0),
                                      _mean(0x0), _sigma(0x0), _meanRefl(0x0), _sigmaRefl(0x0), _tau(0x0), _fracRefl(0x0),
                                      _meanReflDoubleGaus(0x0), _sigmaReflDoubleGaus(0x0), _rawYield(0x0), _reflOverSgn(0),
@@ -56,6 +58,8 @@ InvMassFitter2D::InvMassFitter2D(TTree *tree, const char *pairType) : _tree(tree
                                                                       rooMCand2("fMCand2", "invariant-mass of the second candidate", 1.70, 2.05),
                                                                       rooYCand1("fYCand1", "y of candidate 1", -1., 1.),
                                                                       rooYCand2("fYCand2", "y of candidate 2", -1., 1.),
+                                                                      rooPhiCand1("fPhiCand1", "phi of candidate 1", -3.5, 3.5),
+                                                                      rooPhiCand2("fPhiCand2", "phi of candidate 2", -3.5, 3.5),
                                                                       _efficiencyMap(0x0),
                                                                       _mean(0x0), _sigma(0x0), _meanRefl(0x0), _sigmaRefl(0x0), _tau(0x0), _fracRefl(0x0),
                                                                       _meanReflDoubleGaus(0x0), _sigmaReflDoubleGaus(0x0), _rawYield(0x0), _reflOverSgn(0),
@@ -80,6 +84,8 @@ void InvMassFitter2D::_loadTreeInfo()
   _tree->SetBranchAddress("fPtCand2", &ptCand2);
   _tree->SetBranchAddress("fYCand1", &yCand1);
   _tree->SetBranchAddress("fYCand2", &yCand2);
+  _tree->SetBranchAddress("fPhiCand1", &phiCand1);
+  _tree->SetBranchAddress("fPhiCand2", &phiCand2);
   _tree->SetBranchAddress("fMDCand1", &mDCand1);
   _tree->SetBranchAddress("fMDCand2", &mDCand2);
   _tree->SetBranchAddress("fMDbarCand1", &mDbarCand1);
@@ -103,6 +109,9 @@ void InvMassFitter2D::_loadTreeInfo()
     ptCand1 = 0.;
     ptCand2 = 0.;
     yCand1 = 0.;
+    yCand2 = 0.;
+    phiCand1 = 0.;
+    phiCand2 = 0.;
     mDCand1 = 0.;
     mDCand2 = 0.;
     mDbarCand1 = 0.;
@@ -185,11 +194,11 @@ void InvMassFitter2D::createDataset()
   rooCandType2.defineType("TrueD", TrueD);
   rooCandType2.defineType("TrueDbar", TrueDbar);
   // Create a rooArgSet containing our variables of interest
-  RooArgSet vars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2); // Cand 1: D, Cand 2: Dbar (OS)
+  RooArgSet vars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2, rooPhiCand1, rooPhiCand2); // Cand 1: D, Cand 2: Dbar (OS)
 
   RooRealVar weightCand1("weightCand1", "weights of cand 1", 1., 0., 100.);
   RooRealVar weightCand2("weightCand2", "weights of cand 2", 1., 0., 100.);
-  RooArgSet weightedVars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2, weightCand1, weightCand2);
+  RooArgSet weightedVars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2, rooPhiCand1, rooPhiCand2, weightCand1, weightCand2);
   RooFormulaVar combinedWeight("combinedWeight", "combined weight", "weightCand1 * weightCand2", RooArgList(weightCand1, weightCand2));
 
   // Create an empty dataset with the variables and category
@@ -219,6 +228,8 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
   _tree->SetBranchAddress("fPtCand2", &ptCand2);
   _tree->SetBranchAddress("fYCand1", &yCand1);
   _tree->SetBranchAddress("fYCand2", &yCand2);
+  _tree->SetBranchAddress("fPhiCand1", &phiCand1);
+  _tree->SetBranchAddress("fPhiCand2", &phiCand2);
   _tree->SetBranchAddress("fMDCand1", &mDCand1);
   _tree->SetBranchAddress("fMDCand2", &mDCand2);
   _tree->SetBranchAddress("fMDbarCand1", &mDbarCand1);
@@ -232,6 +243,9 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
     ptCand1 = 0.;
     ptCand2 = 0.;
     yCand1 = 0.;
+    yCand2 = 0.;
+    phiCand1 = 0.;
+    phiCand2 = 0.;
     mDCand1 = 0.;
     mDCand2 = 0.;
     mDbarCand1 = 0.;
@@ -257,13 +271,13 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
       continue;
     }
 
-    // ROOT::Math::PxPyPzMVector vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
-    // ROOT::Math::PxPyPzMVector vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
-    // ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
+    ROOT::Math::PxPyPzMVector vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
+    ROOT::Math::PxPyPzMVector vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
+    ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
 
-    // TH1F* ptPairHist = new TH1F("ptPairHist", "Pair Pt distribution", 100, 0, 10);
-    // ptPairHist->Fill(vLorentzPair.Pt());
-    // ptPairHist->Draw();
+    TH1F* ptPairHist = new TH1F("ptPairHist", "Pair Pt distribution", 100, 0, 10);
+    ptPairHist->Fill(vLorentzPair.Pt());
+    ptPairHist->Draw();
 
     if (TESTBIT(typePair, DD))
     {
@@ -299,6 +313,8 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
     rooPtCand2.setVal(ptCand2);
     rooYCand1.setVal(yCand1);
     rooYCand2.setVal(yCand2);
+    rooPhiCand1.setVal(yCand1);
+    rooPhiCand2.setVal(yCand2);
 
     double weightCand1 = 1., weightCand2 = 1.;
     double combinedWeight = 1.;

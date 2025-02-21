@@ -22,12 +22,13 @@ using std::cout;
 using std::endl;
 
 void runInvMassFitter2D() {
-    const char *fname =  "~/MyMacros/Correlations_v2/triggered_data/AO2D_Data_Full2024.root";
+    //const char *fname =  "~/MyMacros/Correlations_v2/triggered_data/AO2D_Data_Full2024.root";
+    const char *fname =  "~/MyMacros/corelations_with_phi/AO2D.root";
     //const char *fname =  "~/MyMacros/Correlations_github/AO2D_MC_noAmbiguous.root";
 
     TFile *file = TFile::Open(fname, "read");
-    TFile *foutLS = TFile::Open("test_LS_MC_no_ambiguous.root", "RECREATE");
-    TFile *foutOS = TFile::Open("test_OS_MC_no_ambiguous.root", "RECREATE");
+    TFile *foutLS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_LS_withPhi.root", "RECREATE");
+    TFile *foutOS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_OS_withPhi.root", "RECREATE");
     TFile *fEfficiencies = TFile::Open("~/MyMacros/Correlations_v2/Eff_times_Acc_Map_weighted.root", "read");
 
     if (!file) {
@@ -44,8 +45,10 @@ void runInvMassFitter2D() {
     cout << "Number of TVX entries: " << hCounterTVX->GetEntries() << endl;
     float const LumiTVX = hCounterTVX->GetEntries()/(59.4*1000);    //  micro b^-1
 
-    TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2372467354599136"); // AO2D_Data_Full2024.root
+    //TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2372467354599136"); // AO2D_Data_Full2024.root
     //TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2364937873171829"); // AO2D_MC_no_ambiguous.root
+    TKey *key = (TKey*)file->GetListOfKeys()->At(0);
+    TDirectoryFile *dir = (TDirectoryFile*)file->Get(key->GetName());
 
     TTree *tree = (TTree *)dir->Get("O2d0pair");
     if (!tree) {

@@ -68,7 +68,7 @@ class InvMassFitter2D {
         float _ptMin = 0.;
         float _ptMax = 50.;
 
-        float ptCand1 = 0., ptCand2 = 0., yCand1 = 0., yCand2 = 0., mDCand1 = 0., mDCand2 = 0., mDbarCand1 = 0., mDbarCand2 = 0.;
+        float ptCand1 = 0., ptCand2 = 0., yCand1 = 0., yCand2 = 0., phiCand1 = 0., phiCand2 = 0., mDCand1 = 0., mDCand2 = 0., mDbarCand1 = 0., mDbarCand2 = 0.;
         uint8_t typeCand1 = 0, typeCand2 = 0, typePair = 0;
 
         int _typeOfBkgPdf;
@@ -97,6 +97,8 @@ class InvMassFitter2D {
         RooRealVar rooMCand2;
         RooRealVar rooYCand1;
         RooRealVar rooYCand2;
+        RooRealVar rooPhiCand1;
+        RooRealVar rooPhiCand2;
 
         RooWorkspace _workspace;
         void _loadTreeInfo();

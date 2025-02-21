@@ -65,21 +65,30 @@ void compareRun2() {
     }
     TCanvas *canvas = new TCanvas("canvas", "TGraph Example", 800, 600);
     canvas->SetGrid();
+    gStyle->SetCanvasPreferGL(kTRUE);
 
-    gPrelim->SetMarkerColor(kBlue-3);
+    int myBlue = TColor::GetColorTransparent(kBlue-3, 0.2); // Define transparent color
+
+    gPrelim->SetMarkerColor(myBlue);
     gPrelim->SetMarkerStyle(23);
-    gPrelim->SetLineColor(kBlue-3);
+    gPrelim->SetMarkerSize(1.4);
+    gPrelim->SetLineColor(myBlue);
     gPrelim->SetLineWidth(2);
 
-    g2024->SetMarkerColor(kGreen+2);
+    g2024->SetMarkerColor(kRed);
     g2024->SetMarkerStyle(21);
-    g2024->SetLineColor(kGreen+2);
+    g2024->SetMarkerSize(1.3);
+    g2024->SetLineColor(kRed);
     g2024->SetLineWidth(2);
 
     gRun2->SetMarkerStyle(22);
-    gRun2->SetMarkerColor(kRed);
-    gRun2->SetLineColor(kRed);
+    gRun2->SetMarkerSize(1.4);
+    gRun2->SetMarkerColorAlpha(kGreen+2, 0.7);
+    gRun2->SetLineColorAlpha(kGreen+2, 0.7);
     gRun2->SetLineWidth(2);
+
+    gPad->Modified();
+    gPad->Update();
 
     gRun2->GetYaxis()->SetRangeUser(0.0, 0.15);
     gRun2->Draw("PA");

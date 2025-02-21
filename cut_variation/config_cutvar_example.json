@@ -14,9 +14,7 @@
             "rawYield_Pos010.root",
             "rawYield_Pos011.root",
             "rawYield_Pos012.root",
-            "rawYield_Pos013.root",
-            "rawYield_Pos014.root",
-            "rawYield_Pos015.root"
+            "rawYield_Pos013.root"
         ],
         "histoname": "hRawYields"
     },

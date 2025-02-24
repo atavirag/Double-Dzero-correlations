@@ -55,6 +55,11 @@ class InvMassFitter2D {
         void plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult, const char* title, const char* canvasName);
         void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, int const& candNum, TString physVar);
         void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, TString physVar);
+        void plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* histSignalCand1, TH1F* histSidebandCand2, TH1F* histSignalCand2,
+                                        float const nSideband, float const nSignal, TString const varName, TString canvasName, TFile* fout);
+        void plotDeltaKinematicDistributions(TH1F* histSidebandDeltaPt, TH1F* histSignalDeltaPt, TH1F* histSidebandDeltaY,
+                                            TH1F* histSignalDeltaY, TH1F* histSignalDeltaPhi, TH1F* histSidebandDeltaPhi,
+                                            float const nSideband, float const nSignal, TString canvasName, TFile *fout);
 
     private:
         // Member variables

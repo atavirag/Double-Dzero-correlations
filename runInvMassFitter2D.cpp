@@ -45,8 +45,6 @@ void runInvMassFitter2D() {
     cout << "Number of TVX entries: " << hCounterTVX->GetEntries() << endl;
     float const LumiTVX = hCounterTVX->GetEntries()/(59.4*1000);    //  micro b^-1
 
-    //TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2372467354599136"); // AO2D_Data_Full2024.root
-    //TDirectoryFile *dir = (TDirectoryFile *)file->Get("DF_2364937873171829"); // AO2D_MC_no_ambiguous.root
     TKey *key = (TKey*)file->GetListOfKeys()->At(0);
     TDirectoryFile *dir = (TDirectoryFile*)file->Get(key->GetName());
 
@@ -123,8 +121,8 @@ void runInvMassFitter2D() {
         return;
     }
 
-    fitterLS.setPtLims(1., 10.);
-    fitterOS.setPtLims(1., 10.);
+    fitterLS.setPtLims(1., 24.);
+    fitterOS.setPtLims(1., 24.);
 
     fitterLS.setLumi(LumiTVX);
     fitterOS.setLumi(LumiTVX);

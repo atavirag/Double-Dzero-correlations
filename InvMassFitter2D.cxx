@@ -216,7 +216,7 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
   RooRealVar *weightsCand2;
 
   double totalWeight = 0.; // Variable to store the total weight for normalization
-  if (_efficiencyMap && vars.getSize() != 6)
+  if (_efficiencyMap && vars.getSize() != 8)
   {
     weightsCand1 = dynamic_cast<RooRealVar *>(vars.find("weightCand1"));
     weightsCand2 = dynamic_cast<RooRealVar *>(vars.find("weightCand2"));
@@ -271,14 +271,6 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
       continue;
     }
 
-    ROOT::Math::PxPyPzMVector vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
-    ROOT::Math::PxPyPzMVector vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
-    ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
-
-    TH1F* ptPairHist = new TH1F("ptPairHist", "Pair Pt distribution", 100, 0, 10);
-    ptPairHist->Fill(vLorentzPair.Pt());
-    ptPairHist->Draw();
-
     if (TESTBIT(typePair, DD))
     {
       if ((mDCand1 < _massMin || mDCand1 > _massMax) || (mDCand2 < _massMin || mDCand2 > _massMax))
@@ -313,8 +305,8 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
     rooPtCand2.setVal(ptCand2);
     rooYCand1.setVal(yCand1);
     rooYCand2.setVal(yCand2);
-    rooPhiCand1.setVal(yCand1);
-    rooPhiCand2.setVal(yCand2);
+    rooPhiCand1.setVal(phiCand1);
+    rooPhiCand2.setVal(phiCand2);
 
     double weightCand1 = 1., weightCand2 = 1.;
     double combinedWeight = 1.;
@@ -326,7 +318,7 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
       weightCand1 = calculateWeights(yCand1, ptCand1);
       weightCand2 = calculateWeights(yCand2, ptCand2);
       combinedWeight = weightCand1 * weightCand2;
-      if (vars.getSize() != 6)
+      if (vars.getSize() != 8)
       {
         weightsCand1->setVal(weightCand1);
         weightsCand2->setVal(weightCand2);
@@ -522,6 +514,8 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   RooRealVar *ptCand2 = _workspace.var("fPtCand2");
   RooRealVar *yCand1 = _workspace.var("fYCand1");
   RooRealVar *yCand2 = _workspace.var("fYCand2");
+  RooRealVar *phiCand1 = _workspace.var("fPhiCand1");
+  RooRealVar *phiCand2 = _workspace.var("fPhiCand2");
 
   if (!massCand1 || !massCand2)
   {
@@ -1640,14 +1634,16 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
   RooRealVar *ptCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPtCand2"));
   RooRealVar *yCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fYCand1"));
   RooRealVar *yCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fYCand2"));
-  // TODO: add phi (only available when I rerun the dataset)
+  RooRealVar *phiCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPhiCand1"));
+  RooRealVar *phiCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPhiCand2"));
 
   // Create formula variables for deltaPt and deltaY
   RooRealVar deltaPt("deltaPt", "ptCand1 - ptCand2", 0., -24.0, 24.0);
   RooRealVar deltaY("deltaY", "yCand1 - yCand2", 0., -2.0, 2.0);
+  RooRealVar deltaPhi("deltaPhi", "phiCand1 - phiCand2", 0., -4.0, 4.0);
 
   // Create a set of the variables for the new dataset
-  RooArgSet vars(*ptCand1, *ptCand2, *yCand1, *yCand2, deltaPt, deltaY);
+  RooArgSet vars(*ptCand1, *ptCand2, *yCand1, *yCand2, *phiCand1, *phiCand2, deltaPt, deltaY, deltaPhi);
 
   RooRealVar *mean = _workspace.var("mean");
   RooRealVar *sigma = _workspace.var("sigma");
@@ -1673,14 +1669,18 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
     ptCand2->setVal(row->getRealValue("fPtCand2"));
     yCand1->setVal(row->getRealValue("fYCand1"));
     yCand2->setVal(row->getRealValue("fYCand2"));
+    phiCand1->setVal(row->getRealValue("fPhiCand1"));
+    phiCand2->setVal(row->getRealValue("fPhiCand2"));
 
     // Calculate deltaPt and deltaY
     double deltaPtValue = ptCand1->getVal() - ptCand2->getVal();
     double deltaYValue = yCand1->getVal() - yCand2->getVal();
+    double deltaPhiValue = phiCand1->getVal() - phiCand2->getVal();
 
     // Set the delta values manually in the new dataset
     deltaPt.setVal(deltaPtValue);
     deltaY.setVal(deltaYValue);
+    deltaPhi.setVal(deltaPhiValue);
 
     datasetSidebandRegion->add(vars);
   }
@@ -1885,14 +1885,19 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
     ptCand2->setVal(row->getRealValue("fPtCand2"));
     yCand1->setVal(row->getRealValue("fYCand1"));
     yCand2->setVal(row->getRealValue("fYCand2"));
+    phiCand1->setVal(row->getRealValue("fPhiCand1"));
+    phiCand2->setVal(row->getRealValue("fPhiCand2"));
 
     // Calculate deltaPt and deltaY
     double deltaPtValue = ptCand1->getVal() - ptCand2->getVal();
     double deltaYValue = yCand1->getVal() - yCand2->getVal();
+    double deltaPhiValue = phiCand1->getVal() - phiCand2->getVal();
 
     // Set the delta values manually in the new dataset
     deltaPt.setVal(deltaPtValue);
     deltaY.setVal(deltaYValue);
+    deltaPhi.setVal(deltaPhiValue);
+
 
     datasetSignalRegion->add(vars);
   }
@@ -1904,83 +1909,43 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
   /// ------------------ PT DISTRIBUTIONS --------------------
   /// --------------------------------------------------------
 
-  gROOT->SetBatch(kTRUE);
-
-  double nSideband = datasetSidebandRegion->sumEntries();
-  double nSignal = datasetSignalRegion->sumEntries();
+  float const nSideband = datasetSidebandRegion->sumEntries();
+  float const nSignal = datasetSignalRegion->sumEntries();
 
   // Create histos with pt distributions
-  TH1F* histSidebandCand1 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandCand1", *ptCand1, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSignalCand1 = (TH1F*)datasetSignalRegion->createHistogram("histSignalCand1", *ptCand1, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSidebandPtCand1 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPtCand1", *ptCand1, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSignalPtCand1 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPtCand1", *ptCand1, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSidebandPtCand2 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPtCand2", *ptCand2, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSignalPtCand2 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPtCand2", *ptCand2, Binning(nBins, _ptMin, _ptMax));
 
-  TH1F* histSidebandCand2 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandCand2", *ptCand2, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSignalCand2 = (TH1F*)datasetSignalRegion->createHistogram("histSignalCand2", *ptCand2, Binning(nBins, _ptMin, _ptMax));
-  // Normalise
-  histSidebandCand1->Scale(1.0 / nSideband);
-  histSignalCand1->Scale(1.0 / nSignal);
-  histSidebandCand2->Scale(1.0 / nSideband);
-  histSignalCand2->Scale(1.0 / nSignal);
-
-  setHistoSignalSidebandStyle(histSidebandCand1, histSignalCand1, 1, "#it{p}_{T} (GeV/#it{c})");
-  setHistoSignalSidebandStyle(histSidebandCand2, histSignalCand2, 2, "#it{p}_{T} (GeV/#it{c})");
-
-  TLegend *legendPt = new TLegend(0.6, 0.7, 0.9, 0.9);
-  legendPt->AddEntry(histSidebandCand1, "Sideband Region", "pl");
-  legendPt->AddEntry(histSignalCand1, "Signal Region (not subtracted)", "pl");
-
-  TCanvas* canvasPt = new TCanvas("canvasPt", "canvasPt", 1400, 650);
-  canvasPt->Divide(2, 1); // Divide the canvas into 2 columns and 1 row
-  canvasPt->cd(1); // Select the first pad
-  histSidebandCand1->Draw("PE");
-  histSignalCand1->Draw("samePE");
-  legendPt->Draw();
-  canvasPt->cd(2); // Select the second pad
-  histSidebandCand1->Draw("PE");
-  histSignalCand1->Draw("samePE");
-
-  canvasPt->SaveAs("pt_sidebandRegion.png");
-  fout->cd();
-  canvasPt->Write();
-  canvasPt->Close();
+  plotKinematicDistributions(histSidebandPtCand1, histSignalPtCand1, histSidebandPtCand2, histSignalPtCand2,
+                             nSideband, nSignal, "#it{p}_{T} (GeV/#it{c})", "ptDistributions", fout);
 
   /// --------------------------------------------------------
   /// ------------------- Y DISTRIBUTIONS --------------------
   /// --------------------------------------------------------
-  gROOT->SetBatch(kTRUE);
 
-  // Create histos with pt distributions
+  // Create histos with y distributions
   TH1F* histSidebandYCand1 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandYCand1", *yCand1, Binning(20, -0.6, 0.6));
   TH1F* histSignalYCand1 = (TH1F*)datasetSignalRegion->createHistogram("histSignalYCand1", *yCand1, Binning(20, -0.6, 0.6));
-
   TH1F* histSidebandYCand2 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandYCand2", *yCand2, Binning(20, -0.6, 0.6));
   TH1F* histSignalYCand2 = (TH1F*)datasetSignalRegion->createHistogram("histSignalYCand2", *yCand2, Binning(20, -0.6, 0.6));
-  // Normalise
-  histSidebandYCand1->Scale(1.0 / nSideband);
-  histSignalYCand1->Scale(1.0 / nSignal);
-  histSidebandYCand2->Scale(1.0 / nSideband);
-  histSignalYCand2->Scale(1.0 / nSignal);
 
-  setHistoSignalSidebandStyle(histSidebandYCand1, histSignalYCand1, 1, "#it{y}");
-  setHistoSignalSidebandStyle(histSidebandYCand2, histSignalYCand2, 2, "#it{y}");
+  plotKinematicDistributions(histSidebandYCand1, histSignalYCand1, histSidebandYCand2, histSignalYCand2,
+                             nSideband, nSignal, "#it{y}", "yDistributions", fout);
 
-  TLegend *legendY = new TLegend(0.3, 0.3, 0.7, 0.5);
-  legendY->AddEntry(histSidebandYCand1, "Sideband Region", "pl");
-  legendY->AddEntry(histSignalYCand1, "Signal Region (not subtracted)", "pl");
+  /// --------------------------------------------------------
+  /// ----------------- PHI DISTRIBUTIONS --------------------
+  /// --------------------------------------------------------
 
-  TCanvas* canvasY = new TCanvas("canvasY", "canvasY", 1400, 650);
-  canvasY->Divide(2, 1); // Divide the canvas into 2 columns and 1 row
-  canvasY->cd(1); // Select the first pad
-  histSidebandYCand1->Draw("PE");
-  histSignalYCand1->Draw("samePE");
-  legendY->Draw();
-  canvasY->cd(2); // Select the second pad
-  histSidebandYCand2->Draw("PE");
-  histSignalYCand2->Draw("samePE");
+  // Create histos with phi distributions
+  TH1F* histSidebandPhiCand1 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPhiCand1", *phiCand1, Binning(nBins, 0, 4.0));
+  TH1F* histSignalPhiCand1 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPhiCand1", *phiCand1, Binning(nBins, 0, 4.0));
+  TH1F* histSidebandPhiCand2 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPhiCand2", *phiCand2, Binning(nBins, 0, 4.0));
+  TH1F* histSignalPhiCand2 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPhiCand2", *phiCand2, Binning(nBins, 0, 4.0));
 
-  canvasY->SaveAs("y_sidebandRegion.png");
-  fout->cd();
-  canvasY->Write();
-  canvasY->Close();
+  plotKinematicDistributions(histSidebandPhiCand1, histSignalPhiCand1, histSidebandPhiCand2, histSignalPhiCand2,
+                             nSideband, nSignal, "#phi", "phiDistributions", fout);
 
   /// --------------------------------------------------------------
   /// ------------------ DELTA Y, PT DISTRIBUTIONS --------------------
@@ -1991,36 +1956,59 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
   // Create histos with pt distributions
   TH1F* histSidebandDeltaPt = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandDeltaPt", deltaPt, Binning(40, -_ptMax, _ptMax));
   TH1F* histSidebandDeltaY = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandDeltaY", deltaY, Binning(40, -2.0, 2.0));
-
   TH1F* histSignalDeltaPt = (TH1F*)datasetSignalRegion->createHistogram("histSignalDeltaPt", deltaPt, Binning(40, -_ptMax, _ptMax));
   TH1F* histSignalDeltaY = (TH1F*)datasetSignalRegion->createHistogram("histSignalDeltaY", deltaY, Binning(40, -2.0, 2.0));
-  // Normalise
-  histSidebandDeltaPt->Scale(1.0 / nSideband);
-  histSignalDeltaPt->Scale(1.0 / nSignal);
-  histSidebandDeltaY->Scale(1.0 / nSideband);
-  histSignalDeltaY->Scale(1.0 / nSignal);
+  TH1F* histSidebandDeltaPhi = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandDeltaPhi", deltaPhi, Binning(40, -2.0, 2.0));
+  TH1F* histSignalDeltaPhi = (TH1F*)datasetSignalRegion->createHistogram("histSignalDeltaPhi", deltaPhi, Binning(40, -2.0, 2.0));
 
-  setHistoSignalSidebandStyle(histSidebandDeltaPt, histSignalDeltaPt, "#Delta#it{p}_{T} (GeV/#it{c})");
-  setHistoSignalSidebandStyle(histSidebandDeltaY, histSignalDeltaY, "#Delta#it{y}");
+  plotDeltaKinematicDistributions(histSidebandDeltaPt, histSignalDeltaPt, histSidebandDeltaY, histSignalDeltaY,
+                                  histSignalDeltaPhi, histSidebandDeltaPhi, nSideband, nSignal, "deltaDistributions", fout);
 
-  TLegend *legendDelta = new TLegend(0.3, 0.6, 0.7, 0.8);
-  legendDelta->AddEntry(histSidebandDeltaPt, "Sideband Region", "pl");
-  legendDelta->AddEntry(histSignalDeltaPt, "Signal Region (not subtracted)", "pl");
+  TH1F* hPtPair = new TH1F("hPtPair", "Pair Pt distribution", 100, 0, 15);
+  TH2F* hPtPairVsDeltaPt = new TH2F("ptPairHist", "Pair Pt vs. delta Pt distribution", 75, 0, 15, 30, 0, 6);
 
-  TCanvas* canvasDelta = new TCanvas("canvasDelta", "canvasDelta", 1400, 650);
-  canvasDelta->Divide(2, 1); // Divide the canvas into 2 columns and 1 row
-  canvasDelta->cd(1); // Select the first pad
-  histSidebandDeltaPt->Draw("PE");
-  histSignalDeltaPt->Draw("samePE");
-  legendDelta->Draw();
-  canvasDelta->cd(2); // Select the second pad
-  histSidebandDeltaY->Draw("PE");
-  histSignalDeltaY->Draw("samePE");
+  // Loop over all pairs
+  for (size_t i = 0; i < dataset->numEntries(); ++i) {
+    const RooArgSet* row = dataset->get(i);
 
-  canvasDelta->SaveAs("delta_sidebandRegion.png");
+    double phi1 = static_cast<RooRealVar*>(row->find("fPhiCand1"))->getVal();
+    double y1   = static_cast<RooRealVar*>(row->find("fYCand1"))->getVal();
+    double pt1  = static_cast<RooRealVar*>(row->find("fPtCand1"))->getVal();
+    double m1   = static_cast<RooRealVar*>(row->find("fMCand1"))->getVal();
+
+    double phi2 = static_cast<RooRealVar*>(row->find("fPhiCand2"))->getVal();
+    double y2   = static_cast<RooRealVar*>(row->find("fYCand2"))->getVal();
+    double pt2  = static_cast<RooRealVar*>(row->find("fPtCand2"))->getVal();
+    double m2   = static_cast<RooRealVar*>(row->find("fMCand2"))->getVal();
+
+    double deltaPt = pt1 - pt2;
+
+    // Create Lorentz vectors
+    ROOT::Math::PxPyPzMVector vLorentzCand1 = createLorentzVector(phi1, y1, pt1, m1);
+    ROOT::Math::PxPyPzMVector vLorentzCand2 = createLorentzVector(phi2, y2, pt2, m2);
+    ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
+
+    hPtPair->Fill(vLorentzPair.Pt());  // Fill histogram for each pair
+    hPtPairVsDeltaPt->Fill(vLorentzPair.Pt(), deltaPt);
+
+  }
+  TCanvas *cPtPair = new TCanvas("cPtPair", "cPtPair", 800, 600);
+  hPtPair->SetTitle(Form("#it{p}_{T} of the D-meson pair"));
+  hPtPair->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD} (GeV/#it{c})"));
+  hPtPair->GetYaxis()->SetTitle(Form("Entries"));
+  hPtPair->Draw();
+  cPtPair->SaveAs("ptPairHist.png");
+
+  TCanvas *cPtPairVsDeltaPt = new TCanvas("cPtPairVsDeltaPt", "cPtPairVsDeltaPt", 800, 600);
+  hPtPairVsDeltaPt->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsDeltaPt->GetYaxis()->SetTitle(Form("#Delta#it{p}_{T} (GeV/#it{c})"));
+  hPtPairVsDeltaPt->Draw("colz");
+  cPtPairVsDeltaPt->SaveAs("ptPairVsDeltaPtHist.png");
+
   fout->cd();
-  canvasDelta->Write();
-  canvasDelta->Close();
+  cPtPair->Write();
+  cPtPairVsDeltaPt->Write();
+
 
 }
 
@@ -2104,4 +2092,82 @@ void InvMassFitter2D::setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal
   hSignal->SetTitle(title); // Set the plot title
   hSignal->GetXaxis()->SetTitle(physVar);   // Set the x-axis label
   hSignal->GetYaxis()->SetTitle("Normalised counts");   // Set the y-axis label
+}
+
+void InvMassFitter2D::plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* histSignalCand1, TH1F* histSidebandCand2, TH1F* histSignalCand2,
+                                                float const nSideband, float const nSignal, TString const varName, TString canvasName, TFile *fout) {
+  gROOT->SetBatch(kTRUE);
+
+  // Normalise
+  histSidebandCand1->Scale(1.0 / nSideband);
+  histSignalCand1->Scale(1.0 / nSignal);
+  histSidebandCand2->Scale(1.0 / nSideband);
+  histSignalCand2->Scale(1.0 / nSignal);
+
+  setHistoSignalSidebandStyle(histSidebandCand1, histSignalCand1, 1, varName);
+  setHistoSignalSidebandStyle(histSidebandCand2, histSignalCand2, 2, varName);
+
+  TLegend *legend = new TLegend(0.3, 0.3, 0.7, 0.5);
+  legend->AddEntry(histSidebandCand1, "Sideband Region", "pl");
+  legend->AddEntry(histSignalCand1, "Signal Region (not subtracted)", "pl");
+
+  TCanvas* canvas = new TCanvas(canvasName, canvasName, 1400, 650);
+  canvas->Divide(2, 1); // Divide the canvas into 2 columns and 1 row
+  canvas->cd(1); // Select the first pad
+  histSidebandCand1->Draw("PE");
+  histSignalCand1->Draw("samePE");
+  legend->Draw();
+  canvas->cd(2); // Select the second pad
+  histSidebandCand2->Draw("PE");
+  histSignalCand2->Draw("samePE");
+
+  TString saveName = canvasName + ".png";
+
+  canvas->SaveAs(saveName);
+  fout->cd();
+  canvas->Write();
+  canvas->Close();
+
+}
+
+void InvMassFitter2D::plotDeltaKinematicDistributions(TH1F* histSidebandDeltaPt, TH1F* histSignalDeltaPt, TH1F* histSidebandDeltaY,
+                                                      TH1F* histSignalDeltaY, TH1F* histSignalDeltaPhi, TH1F* histSidebandDeltaPhi,
+                                                      float const nSideband, float const nSignal, TString canvasName, TFile *fout) {
+  gROOT->SetBatch(kTRUE);
+
+  // Normalise
+  histSidebandDeltaPt->Scale(1.0 / nSideband);
+  histSignalDeltaPt->Scale(1.0 / nSignal);
+  histSidebandDeltaY->Scale(1.0 / nSideband);
+  histSignalDeltaY->Scale(1.0 / nSignal);
+  histSidebandDeltaPhi->Scale(1.0 / nSideband);
+  histSignalDeltaPhi->Scale(1.0 / nSignal);
+
+  setHistoSignalSidebandStyle(histSidebandDeltaPt, histSignalDeltaPt, "#Delta#it{p}_{T} (GeV/#it{c})");
+  setHistoSignalSidebandStyle(histSidebandDeltaY, histSignalDeltaY, "#Delta#it{y}");
+  setHistoSignalSidebandStyle(histSidebandDeltaPhi, histSignalDeltaPhi, "#Delta#phi");
+
+  TLegend *legend = new TLegend(0.3, 0.6, 0.7, 0.8);
+  legend->AddEntry(histSidebandDeltaPt, "Sideband Region", "pl");
+  legend->AddEntry(histSignalDeltaPt, "Signal Region (not subtracted)", "pl");
+
+  TCanvas *canvas = new TCanvas("canvasDelta", "canvasDelta", 1700, 650);
+  canvas->Divide(3, 1); // Divide the canvas into 2 columns and 1 row
+  canvas->cd(1);        // Select the first pad
+  histSidebandDeltaPt->Draw("PE");
+  histSignalDeltaPt->Draw("samePE");
+  legend->Draw();
+  canvas->cd(2); // Select the second pad
+  histSidebandDeltaY->Draw("PE");
+  histSignalDeltaY->Draw("samePE");
+  canvas->cd(3); // Select the second pad
+  histSidebandDeltaPhi->Draw("PE");
+  histSignalDeltaPhi->Draw("samePE");
+
+  TString saveName = canvasName + ".png";
+
+  canvas->SaveAs(saveName);
+  fout->cd();
+  canvas->Write();
+  canvas->Close();
 }

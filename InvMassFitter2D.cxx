@@ -45,7 +45,9 @@ InvMassFitter2D::InvMassFitter2D() : _tree(nullptr), _pairType("OS"), nentries(0
                                      rooYCand2("fYCand2", "y of candidate 2", -1., 1.),
                                      rooPhiCand1("fPhiCand1", "phi of candidate 1", -3.5, 3.5),
                                      rooPhiCand2("fPhiCand2", "phi of candidate 2", -3.5, 3.5),
+                                     rooPtPair("fPtPair", "pt of the pair", -50.0, 50.0),
                                      _efficiencyMap(0x0),
+                                     _removeAmbiguous(false),
                                      _mean(0x0), _sigma(0x0), _meanRefl(0x0), _sigmaRefl(0x0), _tau(0x0), _fracRefl(0x0),
                                      _meanReflDoubleGaus(0x0), _sigmaReflDoubleGaus(0x0), _rawYield(0x0), _reflOverSgn(0),
                                      _workspace(0x0), _bkgPdfCand1(0x0), _sgnPdfCand1(0x0), _reflPdfCand1(0x0), _totPdfCand1(0x0),
@@ -60,7 +62,9 @@ InvMassFitter2D::InvMassFitter2D(TTree *tree, const char *pairType) : _tree(tree
                                                                       rooYCand2("fYCand2", "y of candidate 2", -1., 1.),
                                                                       rooPhiCand1("fPhiCand1", "phi of candidate 1", -3.5, 3.5),
                                                                       rooPhiCand2("fPhiCand2", "phi of candidate 2", -3.5, 3.5),
+                                                                      rooPtPair("fPtPair", "pt of the pair", -50.0, 50.0),
                                                                       _efficiencyMap(0x0),
+                                                                      _removeAmbiguous(false),
                                                                       _mean(0x0), _sigma(0x0), _meanRefl(0x0), _sigmaRefl(0x0), _tau(0x0), _fracRefl(0x0),
                                                                       _meanReflDoubleGaus(0x0), _sigmaReflDoubleGaus(0x0), _rawYield(0x0), _reflOverSgn(0),
                                                                       _workspace(0x0), _bkgPdfCand1(0x0), _sgnPdfCand1(0x0), _reflPdfCand1(0x0), _totPdfCand1(0x0),
@@ -106,19 +110,6 @@ void InvMassFitter2D::_loadTreeInfo()
 
   for (int i = 0; i < nentries; i++)
   {
-    ptCand1 = 0.;
-    ptCand2 = 0.;
-    yCand1 = 0.;
-    yCand2 = 0.;
-    phiCand1 = 0.;
-    phiCand2 = 0.;
-    mDCand1 = 0.;
-    mDCand2 = 0.;
-    mDbarCand1 = 0.;
-    mDbarCand2 = 0.;
-    typeCand1 = 0;
-    typeCand2 = 0;
-    typePair = 0;
     _tree->GetEntry(i);
 
     if (TESTBIT(typePair, DD))
@@ -134,6 +125,10 @@ void InvMassFitter2D::_loadTreeInfo()
   }
   cout << " A total of " << nentries << " pairs analyzed " << endl;
   cout << "   nDD: " << nDD << ", nDbarDbar: " << nDbarDbar << "\n   nDDbar: " << nDDbar << ", nDbarD: " << nDbarD << ", nDDbarAll: " << nDDbarAll << endl;
+}
+
+void InvMassFitter2D::removeAmbiguous(bool remove=false) {
+  _removeAmbiguous = remove;
 }
 
 void InvMassFitter2D::setPtLims(double const &ptMin, double const &ptMax)
@@ -200,11 +195,11 @@ void InvMassFitter2D::createDataset()
   rooCandType2.defineType("TrueD", TrueD);
   rooCandType2.defineType("TrueDbar", TrueDbar);
   // Create a rooArgSet containing our variables of interest
-  RooArgSet vars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2, rooPhiCand1, rooPhiCand2); // Cand 1: D, Cand 2: Dbar (OS)
+  RooArgSet vars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2, rooPhiCand1, rooPhiCand2, rooPtPair); // Cand 1: D, Cand 2: Dbar (OS)
 
   RooRealVar weightCand1("weightCand1", "weights of cand 1", 1., 0., 100.);
   RooRealVar weightCand2("weightCand2", "weights of cand 2", 1., 0., 100.);
-  RooArgSet weightedVars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2, rooPhiCand1, rooPhiCand2, weightCand1, weightCand2);
+  RooArgSet weightedVars(rooPtCand1, rooPtCand2, rooMCand1, rooMCand2, rooYCand1, rooYCand2, rooPhiCand1, rooPhiCand2, rooPtPair, weightCand1, weightCand2);
   RooFormulaVar combinedWeight("combinedWeight", "combined weight", "weightCand1 * weightCand2", RooArgList(weightCand1, weightCand2));
 
   // Create an empty dataset with the variables and category
@@ -222,7 +217,7 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
   RooRealVar *weightsCand2;
 
   double totalWeight = 0.; // Variable to store the total weight for normalization
-  if (_efficiencyMap && vars.getSize() != 8)
+  if (_efficiencyMap && vars.getSize() != 9)
   {
     weightsCand1 = dynamic_cast<RooRealVar *>(vars.find("weightCand1"));
     weightsCand2 = dynamic_cast<RooRealVar *>(vars.find("weightCand2"));
@@ -266,132 +261,121 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
       continue;
     }
 
-    ROOT::Math::PxPyPzMVector vLorentzCand1; ROOT::Math::PxPyPzMVector vLorentzCand2;
-    // Create Lorentz vectors
+    // Add cuts to avoid ambiguous candidates
+    if (_removeAmbiguous && (TESTBIT(typeCand1, SelectedD) && TESTBIT(typeCand1, SelectedDbar))) {
+      continue;
+    }
+    if (_removeAmbiguous && (TESTBIT(typeCand2, SelectedD) && TESTBIT(typeCand2, SelectedDbar))) {
+      continue;
+    }
+
+    std::vector<std::string> matchedTypes;
+
+    // Check all matching pair types
     if (TESTBIT(typePair, DD)) {
-      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
-      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
-    }
-    if (TESTBIT(typePair, DDbar)) {
-      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
-      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDbarCand2);
-    }
-    if (TESTBIT(typePair, DbarD)) {
-      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDbarCand1);
-      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
+        if (!((mDCand1 < _massMin || mDCand1 > _massMax) || (mDCand2 < _massMin || mDCand2 > _massMax))) {
+            matchedTypes.push_back("DD");
+        }
     }
     if (TESTBIT(typePair, DbarDbar)) {
-      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDbarCand1);
-      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDbarCand2);
+        if (!((mDbarCand1 < _massMin || mDbarCand1 > _massMax) || (mDbarCand2 < _massMin || mDbarCand2 > _massMax))) {
+            matchedTypes.push_back("DbarDbar");
+        }
     }
-    ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
-
-    // Select pT range using the pT of the pair
-    if (vLorentzPair.Pt() < _ptMinPair || vLorentzPair.Pt() > _ptMaxPair) {
-      continue;
+    if (TESTBIT(typePair, DDbar)) {
+        if (!((mDCand1 < _massMin || mDCand1 > _massMax) || (mDbarCand2 < _massMin || mDbarCand2 > _massMax))) {
+            matchedTypes.push_back("DDbar");
+        }
     }
-
-    // Add cuts to avoid ambiguous candidates
-    if (TESTBIT(typeCand1, SelectedD) && TESTBIT(typeCand1, SelectedDbar)) {
-      continue;
-    }
-    if (TESTBIT(typeCand2, SelectedD) && TESTBIT(typeCand2, SelectedDbar)) {
-      continue;
+    if (TESTBIT(typePair, DbarD)) {
+        if (!((mDbarCand1 < _massMin || mDbarCand1 > _massMax) || (mDCand2 < _massMin || mDCand2 > _massMax))) {
+            matchedTypes.push_back("DbarD");
+        }
     }
 
-    if (TESTBIT(typePair, DD)) {
-      if ((mDCand1 < _massMin || mDCand1 > _massMax) || (mDCand2 < _massMin || mDCand2 > _massMax))
+    // Process all matching pair types
+    for (const auto &pairType : matchedTypes) {
+      ROOT::Math::PxPyPzMVector vLorentzCand1; ROOT::Math::PxPyPzMVector vLorentzCand2;
+      // Create Lorentz vectors
+      if (pairType == "DD") {
+        vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
+        vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
+      } else if (pairType == "DbarDbar") {
+        vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
+        vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDbarCand2);
+      } else if (pairType == "DDbar") {
+        vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDbarCand1);
+        vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
+      } else if (pairType == "DbarD") {
+        vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDbarCand1);
+        vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDbarCand2);
+      }
+      ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
+
+      if (!(vLorentzPair.Pt() >= _ptMinPair && vLorentzPair.Pt() <= _ptMaxPair)) {
         continue;
-
-      rooMCand1.setVal(mDCand1);
-      rooMCand2.setVal(mDCand2);
-    }
-    if (TESTBIT(typePair, DbarDbar))
-    {
-      if ((mDbarCand1 < _massMin || mDbarCand1 > _massMax) || (mDbarCand2 < _massMin || mDbarCand2 > _massMax))
-        continue;
-      rooMCand1.setVal(mDbarCand1);
-      rooMCand2.setVal(mDbarCand2);
-    }
-    if (TESTBIT(typePair, DDbar))
-    {
-      if ((mDCand1 < _massMin || mDCand1 > _massMax) || (mDbarCand2 < _massMin || mDbarCand2 > _massMax))
-        continue;
-      rooMCand1.setVal(mDCand1);
-      rooMCand2.setVal(mDbarCand2);
-    }
-    if (TESTBIT(typePair, DbarD))
-    {
-      if ((mDbarCand1 < _massMin || mDbarCand1 > _massMax) || (mDCand2 < _massMin || mDCand2 > _massMax))
-        continue;
-      rooMCand1.setVal(mDCand2);
-      rooMCand2.setVal(mDbarCand1);
-    }
-
-    rooPtCand1.setVal(ptCand1);
-    rooPtCand2.setVal(ptCand2);
-    rooYCand1.setVal(yCand1);
-    rooYCand2.setVal(yCand2);
-    rooPhiCand1.setVal(phiCand1);
-    rooPhiCand2.setVal(phiCand2);
-
-    double weightCand1 = 1., weightCand2 = 1.;
-    double combinedWeight = 1.;
-
-    totalWeight += combinedWeight;
-
-    if (_efficiencyMap)
-    {
-      weightCand1 = calculateWeights(yCand1, ptCand1);
-      weightCand2 = calculateWeights(yCand2, ptCand2);
-      combinedWeight = weightCand1 * weightCand2;
-      if (vars.getSize() != 8)
-      {
-        weightsCand1->setVal(weightCand1);
-        weightsCand2->setVal(weightCand2);
       }
-    }
 
-    if (strcmp(_pairType, "OS") == 0)
-    {
-      if (TESTBIT(typePair, DDbar))
-      {
-        if (vars.getSize() != 6)
-          data.add(vars, combinedWeight);
-        else
-          data.add(vars);
+      if (pairType == "DD") {
+        rooMCand1.setVal(mDCand1);
+        rooMCand2.setVal(mDCand2);
+      } else if (pairType == "DbarDbar") {
+        rooMCand1.setVal(mDbarCand1);
+        rooMCand2.setVal(mDbarCand2);
+      } else if (pairType == "DDbar") {
+        rooMCand1.setVal(mDCand1);
+        rooMCand2.setVal(mDbarCand2);
+      } else if (pairType == "DbarD") {
+        rooMCand1.setVal(mDCand2);
+        rooMCand2.setVal(mDbarCand1);
       }
-      if (TESTBIT(typePair, DbarD))
-      {
-        if (vars.getSize() != 6)
-          data.add(vars, combinedWeight);
-        else
-          data.add(vars);
+
+      // Set kinematic variables
+      rooPtCand1.setVal(ptCand1);
+      rooPtCand2.setVal(ptCand2);
+      rooYCand1.setVal(yCand1);
+      rooYCand2.setVal(yCand2);
+      rooPhiCand1.setVal(phiCand1);
+      rooPhiCand2.setVal(phiCand2);
+      rooPtPair.setVal(vLorentzPair.Pt());
+
+      double weightCand1 = 1., weightCand2 = 1.;
+      double combinedWeight = 1.;
+
+      totalWeight += combinedWeight;
+
+      if (_efficiencyMap) {
+        weightCand1 = calculateWeights(yCand1, ptCand1);
+        weightCand2 = calculateWeights(yCand2, ptCand2);
+        combinedWeight = weightCand1 * weightCand2;
+        if (vars.getSize() != 9) {
+          weightsCand1->setVal(weightCand1);
+          weightsCand2->setVal(weightCand2);
+        }
       }
-    }
-    else if (strcmp(_pairType, "LS") == 0)
-    {
-      if (TESTBIT(typePair, DD))
-      {
-        if (vars.getSize() != 6)
-          data.add(vars, combinedWeight);
-        else
-          data.add(vars);
+
+      if (strcmp(_pairType, "OS") == 0) {
+        if (pairType == "DDbar" || pairType == "DbarD") {
+          if (vars.getSize() != 9)
+            data.add(vars, combinedWeight);
+          else
+            data.add(vars);
+        }
+      } else if (strcmp(_pairType, "LS") == 0) {
+        if (pairType == "DD" || pairType == "DbarDbar") {
+          if (vars.getSize() != 9)
+            data.add(vars, combinedWeight);
+          else
+            data.add(vars);
+        }
+      } else {
+        cerr << "ERROR: wrong pairType assigned. Please choose OS or LS" << endl;
+        return;
       }
-      if (TESTBIT(typePair, DbarDbar))
-      {
-        if (vars.getSize() != 6)
-          data.add(vars, combinedWeight);
-        else
-          data.add(vars);
-      }
-    }
-    else
-    {
-      cerr << "ERROR: wrong pairType assigned. Please choose OS or LS" << endl;
-      return;
     }
   }
+
+  // Import dataset after processing all pair types
   _workspace.import(data);
   cout << "data loaded" << endl;
 }
@@ -528,8 +512,7 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   RooDataSet *dataset = dynamic_cast<RooDataSet *>(_workspace.data("data"));
   RooDataSet *weightedDataset = dynamic_cast<RooDataSet *>(_workspace.data("weightedData"));
 
-  if (!dataset)
-  {
+  if (!dataset) {
     cerr << "ERROR: dataset not found!" << endl;
     return;
   }
@@ -1992,31 +1975,28 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
                                   histSignalDeltaPhi, histSidebandDeltaPhi, nSideband, nSignal, "deltaDistributions", fout);
 
   TH1F* hPtPair = new TH1F("hPtPair", "Pair Pt distribution", 100, 0, 15);
-  TH2F* hPtPairVsDeltaPt = new TH2F("ptPairHist", "Pair Pt vs. delta Pt distribution", 75, 0, 15, 30, 0, 6);
+  TH2F* hPtPairVsDeltaPt = new TH2F("ptPairHist", "Pair Pt vs. delta Pt distribution", 75, 0, 15, 30, -6, 6);
 
   // Loop over all pairs
   for (size_t i = 0; i < dataset->numEntries(); ++i) {
     const RooArgSet* row = dataset->get(i);
 
-    double phi1 = static_cast<RooRealVar*>(row->find("fPhiCand1"))->getVal();
-    double y1   = static_cast<RooRealVar*>(row->find("fYCand1"))->getVal();
-    double pt1  = static_cast<RooRealVar*>(row->find("fPtCand1"))->getVal();
-    double m1   = static_cast<RooRealVar*>(row->find("fMCand1"))->getVal();
+    double phi1  = static_cast<RooRealVar*>(row->find("fPhiCand1"))->getVal();
+    double y1    = static_cast<RooRealVar*>(row->find("fYCand1"))->getVal();
+    double pt1   = static_cast<RooRealVar*>(row->find("fPtCand1"))->getVal();
+    double m1    = static_cast<RooRealVar*>(row->find("fMCand1"))->getVal();
 
-    double phi2 = static_cast<RooRealVar*>(row->find("fPhiCand2"))->getVal();
-    double y2   = static_cast<RooRealVar*>(row->find("fYCand2"))->getVal();
-    double pt2  = static_cast<RooRealVar*>(row->find("fPtCand2"))->getVal();
-    double m2   = static_cast<RooRealVar*>(row->find("fMCand2"))->getVal();
+    double phi2  = static_cast<RooRealVar*>(row->find("fPhiCand2"))->getVal();
+    double y2    = static_cast<RooRealVar*>(row->find("fYCand2"))->getVal();
+    double pt2   = static_cast<RooRealVar*>(row->find("fPtCand2"))->getVal();
+    double m2    = static_cast<RooRealVar*>(row->find("fMCand2"))->getVal();
+
+    double ptPair = static_cast<RooRealVar*>(row->find("fPtPair"))->getVal();
 
     double deltaPt = pt1 - pt2;
 
-    // Create Lorentz vectors
-    ROOT::Math::PxPyPzMVector vLorentzCand1 = createLorentzVector(phi1, y1, pt1, m1);
-    ROOT::Math::PxPyPzMVector vLorentzCand2 = createLorentzVector(phi2, y2, pt2, m2);
-    ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
-
-    hPtPair->Fill(vLorentzPair.Pt());  // Fill histogram for each pair
-    hPtPairVsDeltaPt->Fill(vLorentzPair.Pt(), deltaPt);
+    hPtPair->Fill(ptPair);  // Fill histogram for each pair
+    hPtPairVsDeltaPt->Fill(ptPair, deltaPt);
 
   }
   TCanvas *cPtPair = new TCanvas("cPtPair", "cPtPair", 800, 600);

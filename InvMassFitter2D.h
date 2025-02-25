@@ -36,6 +36,7 @@ class InvMassFitter2D {
         // Functions to set parameters manually
         void set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency);
         void setLumi(double const& lumi);
+        void removeAmbiguous(bool remove=false);
         void setPtLims(double const& ptMin, double const& ptMax);
         void setPtPairLims(double const& ptMinPair, double const& ptMaxPair);
         void setMassLims(double const& massMin, double const& massMax);
@@ -85,6 +86,7 @@ class InvMassFitter2D {
         TString _sgnFuncOption;
         TString _bkgFuncOption;
         TString _reflFuncOption;
+        bool _removeAmbiguous;
 
         RooRealVar* _tau;
         RooRealVar* _mean;
@@ -107,6 +109,7 @@ class InvMassFitter2D {
         RooRealVar rooYCand2;
         RooRealVar rooPhiCand1;
         RooRealVar rooPhiCand2;
+        RooRealVar rooPtPair;
 
         RooWorkspace _workspace;
         void _loadTreeInfo();

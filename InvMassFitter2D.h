@@ -37,6 +37,7 @@ class InvMassFitter2D {
         void set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency);
         void setLumi(double const& lumi);
         void setPtLims(double const& ptMin, double const& ptMax);
+        void setPtPairLims(double const& ptMinPair, double const& ptMaxPair);
         void setMassLims(double const& massMin, double const& massMax);
         void setSgnFunc(TString const& sgnFunc);
         void setBkgFunc(TString  const& bkgFunc);
@@ -72,6 +73,8 @@ class InvMassFitter2D {
         float _massMax = 2.05;
         float _ptMin = 0.;
         float _ptMax = 50.;
+        float _ptMinPair = 0.;
+        float _ptMaxPair = 50.;
 
         float ptCand1 = 0., ptCand2 = 0., yCand1 = 0., yCand2 = 0., phiCand1 = 0., phiCand2 = 0., mDCand1 = 0., mDCand2 = 0., mDbarCand1 = 0., mDbarCand2 = 0.;
         uint8_t typeCand1 = 0, typeCand2 = 0, typePair = 0;

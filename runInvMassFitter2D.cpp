@@ -124,6 +124,9 @@ void runInvMassFitter2D() {
     fitterLS.setPtLims(1., 24.);
     fitterOS.setPtLims(1., 24.);
 
+    fitterLS.setPtPairLims(1., 5.);
+    fitterOS.setPtPairLims(1., 5.);
+
     fitterLS.setLumi(LumiTVX);
     fitterOS.setLumi(LumiTVX);
 

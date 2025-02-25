@@ -142,6 +142,12 @@ void InvMassFitter2D::setPtLims(double const &ptMin, double const &ptMax)
   _ptMax = ptMax;
 }
 
+void InvMassFitter2D::setPtPairLims(double const &ptMinPair, double const &ptMaxPair)
+{
+  _ptMinPair = ptMinPair;
+  _ptMaxPair = ptMaxPair;
+}
+
 void InvMassFitter2D::setLumi(double const &lumi)
 {
   _lumi = lumi;
@@ -255,24 +261,45 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
     typePair = 0;
     _tree->GetEntry(i);
 
-    // Select pT range
-    if ((ptCand1 < _ptMin || ptCand2 < _ptMin) || (ptCand1 > _ptMax || ptCand2 > _ptMax))
-    {
+    // Select pT range using the pT of the pair
+    if ((ptCand1 < _ptMin || ptCand2 < _ptMin) || (ptCand1 > _ptMax || ptCand2 > _ptMax)) {
+      continue;
+    }
+
+    ROOT::Math::PxPyPzMVector vLorentzCand1; ROOT::Math::PxPyPzMVector vLorentzCand2;
+    // Create Lorentz vectors
+    if (TESTBIT(typePair, DD)) {
+      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
+      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
+    }
+    if (TESTBIT(typePair, DDbar)) {
+      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDCand1);
+      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDbarCand2);
+    }
+    if (TESTBIT(typePair, DbarD)) {
+      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDbarCand1);
+      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDCand2);
+    }
+    if (TESTBIT(typePair, DbarDbar)) {
+      vLorentzCand1 = createLorentzVector(phiCand1, yCand1, ptCand1, mDbarCand1);
+      vLorentzCand2 = createLorentzVector(phiCand2, yCand2, ptCand2, mDbarCand2);
+    }
+    ROOT::Math::PxPyPzMVector vLorentzPair = vLorentzCand1 + vLorentzCand2;
+
+    // Select pT range using the pT of the pair
+    if (vLorentzPair.Pt() < _ptMinPair || vLorentzPair.Pt() > _ptMaxPair) {
       continue;
     }
 
     // Add cuts to avoid ambiguous candidates
-    if (TESTBIT(typeCand1, SelectedD) && TESTBIT(typeCand1, SelectedDbar))
-    {
+    if (TESTBIT(typeCand1, SelectedD) && TESTBIT(typeCand1, SelectedDbar)) {
       continue;
     }
-    if (TESTBIT(typeCand2, SelectedD) && TESTBIT(typeCand2, SelectedDbar))
-    {
+    if (TESTBIT(typeCand2, SelectedD) && TESTBIT(typeCand2, SelectedDbar)) {
       continue;
     }
 
-    if (TESTBIT(typePair, DD))
-    {
+    if (TESTBIT(typePair, DD)) {
       if ((mDCand1 < _massMin || mDCand1 > _massMax) || (mDCand2 < _massMin || mDCand2 > _massMax))
         continue;
 
@@ -1848,7 +1875,7 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
 
         // Calculate signal probability using likelihood ratio
         double signalProbCand2 = signalLikelihoodCand2 / (signalLikelihoodCand2 + backgroundLikelihoodCand2);
-        cout << signalLikelihoodCand2 << " bkg likelihood: " << backgroundLikelihoodCand2 << endl;
+        //cout << signalLikelihoodCand2 << " bkg likelihood: " << backgroundLikelihoodCand2 << endl;
 
         // Classify based on probability (e.g., using a threshold)
         if (signalProbCand2 > 0.5) { // Adjust threshold as needed

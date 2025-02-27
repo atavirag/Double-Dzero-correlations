@@ -39,17 +39,20 @@ void efficiencyMap_PVContrib()
 
     TString const fileNameGen = jsonData["files"]["filenameGen"];
     TString const fileNameReco = jsonData["files"]["filenameReco"];
+    TString const fileNameData = jsonData["files"]["filenameData"];
 
     std::string const outputDirName = jsonData["outputDir"];
 
     TString const hNameReco = jsonData["histos"]["hNameReco"];
     TString const hNameGen = jsonData["histos"]["hNameGen"];
+    TString const hNameData = jsonData["histos"]["hNameData"];
 
     // Load data
     TFile *fGen = TFile::Open(fileNameGen);
     TFile *fReco = TFile::Open(fileNameReco);
+    TFile *fData = TFile::Open(fileNameData);
 
-    if (!fReco || !fGen)
+    if (!fReco || !fGen || !fData)
     {
         cerr << "ERROR: files not found\n";
         return;
@@ -59,15 +62,26 @@ void efficiencyMap_PVContrib()
     TFile *outputFile = new TFile(outputName.c_str(), "RECREATE");
     outputFile->cd();
 
-    TString dirnameGen = "hf-task-d0";
+    //TString dirnameGen = "hf-task-d0";
     TString dirname = "hf-correlator-d-meson-pairs";
 
     TDirectory *dirReco = (TDirectory *)fReco->Get(dirname);
     TDirectory *dirGen = (TDirectory *)fGen->Get(dirname);
+    TDirectory *dirData = (TDirectory *)fData->Get(dirname);
 
     // Load MC histos
     TH3F *hPtVsYReco = (TH3F *)dirReco->Get(hNameReco);
     TH3F *hPtVsYGen = (TH3F *)dirGen->Get(hNameGen);
+    // Load data histo
+    TH1F *hNContrib = (TH1F *)dirData->Get(hNameData);
+
+
+    double dataIntegral = hNContrib->Integral();
+    double recoIntegral = hPtVsYReco->ProjectionZ()->Integral();
+    double genIntegral = hPtVsYGen->ProjectionZ()->Integral();
+
+    TH1F *hNContribReco = (TH1F *)hPtVsYReco->ProjectionZ();
+    TH1F *hNContribGen = (TH1F *)hPtVsYGen->ProjectionZ();
 
     if (verbose)
     {
@@ -110,32 +124,38 @@ void efficiencyMap_PVContrib()
         {
             // Weight the distributions using nContrib info
             double weightSumReco = 0.0, weightSumGen = 0.0;
-            double valueSumReco = 0.0, valueSumGen = 0.0;
-
             for (int in = 1; in <= nbinsNContrib; in++)
             {
                 double binContentReco = hPtVsYReco->GetBinContent(ipt, iy, in);
-                double nContribValueReco = hPtVsYReco->GetZaxis()->GetBinCenter(in);
-
                 double binContentGen = hPtVsYGen->GetBinContent(ipt, iy, in);
-                double nContribValueGen = hPtVsYGen->GetZaxis()->GetBinCenter(in);
 
-                weightSumReco += nContribValueReco * binContentReco;
-                weightSumGen += nContribValueGen * binContentGen;
-                valueSumReco += binContentReco;
-                valueSumGen += binContentGen;
+                double nContribValueData = hNContrib->GetBinContent(in);
+                double nContribValueMCReco = hNContribReco->GetBinContent(in); // MC shape in NContrib
+                double nContribValueMCGen = hNContribGen->GetBinContent(in); // MC shape in NContrib
+
+                double dataRecoWeight = 1.0;
+                double dataGenWeight = 1.0;
+                if (nContribValueData > 0) {
+                    dataRecoWeight = (nContribValueMCReco / recoIntegral) / (nContribValueData/dataIntegral);
+                    dataGenWeight = (nContribValueMCGen / genIntegral) / (nContribValueData/dataIntegral);
+                }
+
+                weightSumReco += (dataRecoWeight * binContentReco);
+                weightSumGen += ( dataGenWeight * binContentGen);
             }
             // Compute the weighted average (or leave as summed weights)
             if (valueSumReco > 0)
             {
-                hPtVsYRecoWeighted->SetBinContent(ipt, iy, weightSumReco / valueSumReco);
+                hPtVsYRecoWeighted->SetBinContent(ipt, iy, weightSumReco);
+                cout << "weightSumReco " << weightSumReco << " valueSumReco " << valueSumReco << endl;
             }
             if (valueSumGen > 0)
             {
-                hPtVsYGenWeighted->SetBinContent(ipt, iy, weightSumGen / valueSumGen);
+                hPtVsYGenWeighted->SetBinContent(ipt, iy, weightSumGen);
             }
         }
     }
+
 
     // Divide histos point by point
     for (int ipt = 1; ipt <= nbinsPt; ipt++)

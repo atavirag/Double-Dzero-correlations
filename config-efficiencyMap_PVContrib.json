@@ -3,15 +3,17 @@
     "debug": true,
 
     "files": {
-        "filenameGen": "/home/andrea/MyMacros/O2Developments/AnalysisResults.root",
-        "filenameReco": "/home/andrea/MyMacros/O2Developments/AnalysisResults.root"
+        "filenameGen": "/home/andrea/MyMacros/Correlations_github/AnalysisResults_k3_PVContrib.root",
+        "filenameReco": "/home/andrea/MyMacros/Correlations_github/AnalysisResults_k3_PVContrib.root",
+        "filenameData": "/home/andrea/MyMacros/Correlations_github/AnalysisResults_data_af.root"
     },
 
     "histos": {
         "hNameReco": "hPtVsYVsNContribMcRec",
-        "hNameGen": "hPtVsYVsNContribMcGen"
+        "hNameGen": "hPtVsYVsNContribMcGen",
+        "hNameData": "hPVContrib"
     },
 
     "isLog_eff": true,
-    "outputDir": "/home/andrea/MyMacros/Correlations_v2/"
+    "outputDir": "/home/andrea/MyMacros/Correlations_github/"
 }

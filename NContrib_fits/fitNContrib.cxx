@@ -53,10 +53,13 @@ void fitNContrib() {
         return;
     }
 
-    hNContrib->Rebin(5); // Rebin by a factor of 5 (merges 5 bins into 1)
-    hNContribMc->Rebin(5); // Rebin by a factor of 5 (merges 5 bins into 1)
-    hNContrib->GetXaxis()->SetRangeUser(10.0, 180.0);
-    hNContribMc->GetXaxis()->SetRangeUser(10.0, 120.0);
+    hNContrib->Rebin(1); // Rebin by a factor of 5 (merges 5 bins into 1)
+    hNContribMc->Rebin(1); // Rebin by a factor of 5 (merges 5 bins into 1)
+    hNContrib->GetXaxis()->SetRangeUser(1.0, 180.0);
+    hNContribMc->GetXaxis()->SetRangeUser(1.0, 180.0);
+
+    int nBinsX = hNContrib->GetNbinsX();
+    std::cout << "Number of bins in X: " << nBinsX << std::endl;
 
     // Define the fitting function
     double mean = hNContrib->GetMean();
@@ -66,37 +69,43 @@ void fitNContrib() {
     double rmsMc = hNContribMc->GetRMS();
 
     // Define the variable corresponding to the x-axis (the PV contributors)
-    RooRealVar pvContrib("pvContrib", "PV Contributors", 10.0, 180.0);
+    RooRealVar pvContrib("pvContrib", "PV Contributors", 1.0, 180.0);
     RooRealVar mu("mu", "Mean", mean-rms, mean - 4*rms, mean + rms);
     RooRealVar sigma("sigma", "Sigma", rms, 0.0, 4 * rms);
 
-    RooRealVar pvContribMc("pvContribMc", "PV MC Contributors", 10.0, 120.0); // not needed when I get the right PV MC range
     RooRealVar muMc("muMc", "Mean", meanMc-rmsMc, meanMc - 2*rmsMc, meanMc + rmsMc);
     RooRealVar sigmaMc("sigmaMc", "Sigma", rmsMc, 0.0, 2 * rmsMc);
+    RooGaussian gauss("gauss", "Gaussian Core", pvContrib, muMc, sigmaMc);
+
+    RooRealVar lambda("lambda", "Exponential decay", 0.05, -2, 2);
+    RooExponential expo("expo", "Exponential Tail", pvContrib, lambda);
+
+    RooRealVar fraction("fraction", "Fraction of Gaussian", 0.8, 0.0, 1.0);
+    RooAddPdf modelMc("model", "Gaussian + Exponential", RooArgList(gauss, expo), fraction);
 
     RooRealVar tail("tail", "Tail parameter", -0.5, -2, 2);
     RooRealVar tailMc("tailMc", "Tail parameter", -0.5, -2, 2);
 
     RooNovosibirsk novo("novo", "Novosibirsk Function", pvContrib, mu, sigma, tail);
-    RooNovosibirsk novoMc("novoMc", "Novosibirsk Function", pvContribMc, muMc, sigmaMc, tailMc);
+    RooNovosibirsk novoMc("novoMc", "Novosibirsk Function", pvContrib, muMc, sigmaMc, tailMc);
 
 
     RooDataHist data("data", "Histogram Data", RooArgList(pvContrib), hNContrib);
-    RooDataHist dataMc("dataMc", "Histogram Data MC", RooArgList(pvContribMc), hNContribMc);
+    RooDataHist dataMc("dataMc", "Histogram Data MC", RooArgList(pvContrib), hNContribMc);
     // Fit to data
     RooFitResult* fitResult = novo.fitTo(data, RooFit::Extended(true), RooFit::Save());
     //RooFitResult* fitResult = bifCB->fitTo(data, RooFit::Extended(true), RooFit::Save());
     //RooFitResult* fitResult = doubleGauss.fitTo(data, RooFit::Save());
     fitResult->Print("v");
 
-    RooFitResult* fitResultMc = novoMc.fitTo(dataMc, RooFit::Extended(true), RooFit::Save());
+    RooFitResult* fitResultMc = modelMc.fitTo(dataMc, RooFit::Extended(true), RooFit::Save());
     fitResultMc->Print("v");
 
     RooPlot* frame = pvContrib.frame();
     data.plotOn(frame);
     novo.plotOn(frame);
 
-    RooPlot* frameMc = pvContribMc.frame();
+    RooPlot* frameMc = pvContrib.frame();
     dataMc.plotOn(frameMc);
     novoMc.plotOn(frameMc);
 
@@ -126,6 +135,48 @@ void fitNContrib() {
     residFrame->Draw();
     residFrame->Write();
     cRes->SaveAs("hNContrib_residuals.png");
+
+
+    // Finally, divide the two functions
+    //RooFormulaVar weightFunc("weightFunc", "@0/@1", RooArgList(novo, novoMc));
+    RooRealVar normData("normData", "Normalization Data", novo.createIntegral(pvContrib)->getVal());
+    RooRealVar normMc("normMc", "Normalization MC", novoMc.createIntegral(pvContrib)->getVal());
+
+    std::cout << "Normalization Data: " << normData.getVal() << std::endl;
+    std::cout << "Normalization MC: " << normMc.getVal() << std::endl;
+
+
+    RooFormulaVar weightFunc("weightFunc", "(@0/@1)*(@3/@2)", 
+                             RooArgList(novo, novoMc, normData, normMc));
+
+    // Create a frame for plotting
+    RooPlot* frameWeight = pvContrib.frame(RooFit::Title("Weight Function"));
+
+    // Sample the function and plot it
+    weightFunc.plotOn(frameWeight, RooFit::LineColor(kRed), RooFit::LineWidth(2));
+    frameWeight->SetMinimum(0.001);
+
+    // Retrieve the RooCurve from the frame
+    RooCurve* curve = (RooCurve*)frameWeight->getObject(0); // The first object is usually the curve
+
+    // Draw the frame
+    TCanvas c1("c1", "Weight Function", 800, 600);
+    c1.SetLogy();
+    frameWeight->Draw();
+    c1.SaveAs("weightFunction_rooPlot.png");  // Save the plot if needed
+
+    TCanvas c2("c2", "Weight Function", 800, 600);
+    c2.SetLogy();
+    hNContrib->Scale(1.0 / hNContrib->Integral());
+    hNContribMc->Scale(1.0 / hNContribMc->Integral());
+
+    TH1F* hWeight = (TH1F*)hNContrib->Clone("hWeight");
+    hWeight->Divide(hNContribMc);  // Compute bin-by-bin ratio
+
+    hWeight->Draw();
+    c2.SaveAs("weightFunction_histos.png");  // Save the plot if needed
+    hWeight->Write();
+
 
     // Cleanup
     fout->Close();

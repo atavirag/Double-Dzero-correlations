@@ -1,0 +1,61 @@
+---
+data_prep:
+  pt_chosen: pt2
+  dirs:
+    Signal:
+      [
+        BDT_training_D0/LHC24g5/pt2
+      ]
+    Bkg: [BDT_training_D0/HF_LHC22o_pass7_small_D0/pt2]
+  # options: D0ToKPi, DplusToPiKPi, DsToKKPi, LcToPKPi, XicToPKPi
+  channel: D0ToKPi
+  enable_sidebands: true
+  sidebands: '1.68 < fM < 1.77 or 1.95 < fM < 2.04'
+  class_balance:
+    share: equal # options: equal, all_signal
+    bkg_factor: 5 # factor to be applied to bkg compared to signal sample
+  test_fraction: 0.2001
+  seed_split: 42
+
+ml:
+  raw_output: false
+  roc_auc_approach: ovo # not used since it's a binary classification
+  roc_auc_average: macro
+  # All vars will be used for the training but fPt and fM
+  vars_to_draw: ['fPt', 'fM', 'fY',
+                  'fBdtOutputNonPrompt', 'fBdtOutputBkg', 
+                  'fDecayLengthNormalised', 'fDecayLengthXYNormalised', 'fMaxNormalisedDeltaIP',
+                  'fNSigTpcTofKa0', 'fNSigTpcTofKa1', 'fNSigTpcTofPi0', 'fNSigTpcTofPi1',
+                  'fImpactParameterProduct', 'fCpa']
+  hyper_pars:
+    {
+      "max_depth": 4,
+      "learning_rate": 0.01,
+      "n_estimators": 1000,
+      "min_child_weight": 5,
+      "n_jobs": 4,
+      "tree_method": hist,
+    }
+  hyper_pars_opt:
+    activate: false
+    ntrials: 25
+    njobs: 4
+    timeout: 2400
+    hyper_par_ranges:
+      {
+        "max_depth": !!python/tuple [3, 6],
+        "learning_rate": !!python/tuple [0.01, 0.1],
+        "n_estimators": !!python/tuple [300, 1500],
+        "min_child_weight": !!python/tuple [1, 10],
+        "subsample": !!python/tuple [0.8, 1.],
+        "colsample_bytree": !!python/tuple [0.8, 1.],
+      }
+
+output:
+  directory: trainings/trainings_doubleD_pass7/
+  model_directory: trainings/trainings_doubleD_pass7/Models
+  out_labels: # output labels, keep the right number of classes
+    Bkg: Bkg
+    Signal: Signal
+  # list of variables saved in the dataframes with the applied models
+  column_to_save_list: ['fM', 'fPt', 'fY']

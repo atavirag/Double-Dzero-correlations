@@ -98,7 +98,7 @@ void efficiencyMap_PVContrib()
 
     TH2F *hEfficiencyMap = (TH2F *)hPtVsYReco->Project3D("yx");
     hEfficiencyMap->Reset();
-    hEfficiencyMap->SetNameTitle("hEfficiencyMap", "efficiency map");
+    hEfficiencyMap->SetNameTitle("hEfficiencyMap", "Efficiency map");
 
     TH2F *hPtVsYRecoWeighted = (TH2F *)hPtVsYReco->Project3D("yx");
     hPtVsYRecoWeighted->Reset();
@@ -120,7 +120,7 @@ void efficiencyMap_PVContrib()
     // Divide histos point by point
     for (int ipt = 1; ipt <= nbinsPt; ipt++)
     {
-        for (int iy = y_min; iy < y_max; iy++)
+        for (int iy = y_min; iy <= y_max; iy++)
         {
             // Weight the distributions using nContrib info
             double weightSumReco = 0.0, weightSumGen = 0.0;
@@ -135,21 +135,26 @@ void efficiencyMap_PVContrib()
 
                 double dataRecoWeight = 1.0;
                 double dataGenWeight = 1.0;
-                if (nContribValueData > 0) {
-                    dataRecoWeight = (nContribValueMCReco / recoIntegral) / (nContribValueData/dataIntegral);
-                    dataGenWeight = (nContribValueMCGen / genIntegral) / (nContribValueData/dataIntegral);
+                if (nContribValueMCReco > 0 && nContribValueMCGen > 0 && 
+                    nContribValueData > 0 && recoIntegral > 0 && genIntegral > 0) {
+                    dataRecoWeight = (nContribValueData/dataIntegral) / (nContribValueMCReco / recoIntegral);
+                    dataGenWeight = (nContribValueData/dataIntegral) / (nContribValueMCGen / genIntegral);
                 }
 
                 weightSumReco += (dataRecoWeight * binContentReco);
                 weightSumGen += ( dataGenWeight * binContentGen);
+
             }
+            double tmpEff = (weightSumGen > 0) ? weightSumReco / weightSumGen : 0;
+            cout << "tmpEff: " << tmpEff << endl;
+
             // Compute the weighted average (or leave as summed weights)
-            if (valueSumReco > 0)
+            if (weightSumReco > 0)
             {
                 hPtVsYRecoWeighted->SetBinContent(ipt, iy, weightSumReco);
-                cout << "weightSumReco " << weightSumReco << " valueSumReco " << valueSumReco << endl;
+                //cout << "weightSumReco " << weightSumReco << endl;
             }
-            if (valueSumGen > 0)
+            if (weightSumGen > 0)
             {
                 hPtVsYGenWeighted->SetBinContent(ipt, iy, weightSumGen);
             }
@@ -209,6 +214,7 @@ void efficiencyMap_PVContrib()
         }
     }
     outputFile->cd();
+    hEfficiencyMap->SetStats(0);
     hEfficiencyMap->Write();
     hPtVsYRecoWeighted->Write();
     hPtVsYGenWeighted->Write();

@@ -29,7 +29,7 @@ void runInvMassFitter2D() {
     TFile *file = TFile::Open(fname, "read");
     TFile *foutLS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_LS_withPhi.root", "RECREATE");
     TFile *foutOS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_OS_withPhi.root", "RECREATE");
-    TFile *fEfficiencies = TFile::Open("~/MyMacros/Correlations_v2/Eff_times_Acc_Map_weighted.root", "read");
+    TFile *fEfficiencies = TFile::Open("~/MyMacros/Correlations_github/Eff_times_Acc_Map_weighted.root", "read");
 
     if (!file) {
         cout << ">> ERROR File not well readout" << endl;
@@ -121,11 +121,14 @@ void runInvMassFitter2D() {
         return;
     }
 
+    fitterLS.removeAmbiguous(false);
+    fitterOS.removeAmbiguous(false);
+
     fitterLS.setPtLims(1., 24.);
     fitterOS.setPtLims(1., 24.);
 
-    fitterLS.setPtPairLims(1., 5.);
-    fitterOS.setPtPairLims(1., 5.);
+    fitterLS.setPtPairLims(-100., 100.);
+    fitterOS.setPtPairLims(-100.0, 100.);
 
     fitterLS.setLumi(LumiTVX);
     fitterOS.setLumi(LumiTVX);

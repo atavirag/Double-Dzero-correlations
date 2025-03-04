@@ -37,14 +37,14 @@ enum CandidateType
 // Constructors
 InvMassFitter2D::InvMassFitter2D() : _tree(nullptr), _pairType("OS"), nentries(0),
                                      _massMin(1.70), _massMax(2.05), _ptMin(0.), _ptMax(50.),
-                                     rooPtCand1("fPtCand1", "pt of candidate 1", 0., 36.),
-                                     rooPtCand2("fPtCand2", "pt of candidate 2", 0., 36.),
+                                     rooPtCand1("fPtCand1", "pt of candidate 1", -36., 36.),
+                                     rooPtCand2("fPtCand2", "pt of candidate 2", -36., 36.),
                                      rooMCand1("fMCand1", "invariant-mass of the first candidate", 1.70, 2.05),
                                      rooMCand2("fMCand2", "invariant-mass of the second candidate", 1.70, 2.05),
                                      rooYCand1("fYCand1", "y of candidate 1", -1., 1.),
                                      rooYCand2("fYCand2", "y of candidate 2", -1., 1.),
-                                     rooPhiCand1("fPhiCand1", "phi of candidate 1", -3.5, 3.5),
-                                     rooPhiCand2("fPhiCand2", "phi of candidate 2", -3.5, 3.5),
+                                     rooPhiCand1("fPhiCand1", "phi of candidate 1", -36., 36.),
+                                     rooPhiCand2("fPhiCand2", "phi of candidate 2", -36., 36.),
                                      rooPtPair("fPtPair", "pt of the pair", -50.0, 50.0),
                                      _efficiencyMap(0x0),
                                      _removeAmbiguous(false),
@@ -54,14 +54,14 @@ InvMassFitter2D::InvMassFitter2D() : _tree(nullptr), _pairType("OS"), nentries(0
                                      _bkgPdfCand2(0x0), _sgnPdfCand2(0x0), _reflPdfCand2(0x0), _totPdfCand2(0x0) {}
 InvMassFitter2D::InvMassFitter2D(TTree *tree, const char *pairType) : _tree(tree), _pairType(pairType), nentries(0),
                                                                       _massMin(1.70), _massMax(2.05), _ptMin(0.), _ptMax(50.),
-                                                                      rooPtCand1("fPtCand1", "pt of candidate 1", 0., 36.),
-                                                                      rooPtCand2("fPtCand2", "pt of candidate 2", 0., 36.),
+                                                                      rooPtCand1("fPtCand1", "pt of candidate 1", -36., 36.),
+                                                                      rooPtCand2("fPtCand2", "pt of candidate 2", -36., 36.),
                                                                       rooMCand1("fMCand1", "invariant-mass of the first candidate", 1.70, 2.05),
                                                                       rooMCand2("fMCand2", "invariant-mass of the second candidate", 1.70, 2.05),
                                                                       rooYCand1("fYCand1", "y of candidate 1", -1., 1.),
                                                                       rooYCand2("fYCand2", "y of candidate 2", -1., 1.),
-                                                                      rooPhiCand1("fPhiCand1", "phi of candidate 1", -3.5, 3.5),
-                                                                      rooPhiCand2("fPhiCand2", "phi of candidate 2", -3.5, 3.5),
+                                                                      rooPhiCand1("fPhiCand1", "phi of candidate 1", -36., 36.),
+                                                                      rooPhiCand2("fPhiCand2", "phi of candidate 2", -36., 36.),
                                                                       rooPtPair("fPtPair", "pt of the pair", -50.0, 50.0),
                                                                       _efficiencyMap(0x0),
                                                                       _removeAmbiguous(false),
@@ -83,13 +83,13 @@ void InvMassFitter2D::_loadTreeInfo()
     cerr << "ERROR: tree not found!" << endl;
     return;
   }
-
-  _tree->SetBranchAddress("fPtCand1", &ptCand1);
-  _tree->SetBranchAddress("fPtCand2", &ptCand2);
+  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
+  _tree->SetBranchAddress("fPtCand1", &phiCand1);
+  _tree->SetBranchAddress("fPtCand2", &phiCand2);
   _tree->SetBranchAddress("fYCand1", &yCand1);
   _tree->SetBranchAddress("fYCand2", &yCand2);
-  _tree->SetBranchAddress("fPhiCand1", &phiCand1);
-  _tree->SetBranchAddress("fPhiCand2", &phiCand2);
+  _tree->SetBranchAddress("fPhiCand1", &ptCand1);
+  _tree->SetBranchAddress("fPhiCand2", &ptCand2);
   _tree->SetBranchAddress("fMDCand1", &mDCand1);
   _tree->SetBranchAddress("fMDCand2", &mDCand2);
   _tree->SetBranchAddress("fMDbarCand1", &mDbarCand1);
@@ -225,12 +225,13 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
 
   // Fill the dataset with info from the tree
   cout << "Number of tree entries " << _tree->GetEntries() << endl;
-  _tree->SetBranchAddress("fPtCand1", &ptCand1);
-  _tree->SetBranchAddress("fPtCand2", &ptCand2);
+  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
+  _tree->SetBranchAddress("fPtCand1", &phiCand1);
+  _tree->SetBranchAddress("fPtCand2", &phiCand2);
   _tree->SetBranchAddress("fYCand1", &yCand1);
   _tree->SetBranchAddress("fYCand2", &yCand2);
-  _tree->SetBranchAddress("fPhiCand1", &phiCand1);
-  _tree->SetBranchAddress("fPhiCand2", &phiCand2);
+  _tree->SetBranchAddress("fPhiCand1", &ptCand1);
+  _tree->SetBranchAddress("fPhiCand2", &ptCand2);
   _tree->SetBranchAddress("fMDCand1", &mDCand1);
   _tree->SetBranchAddress("fMDCand2", &mDCand2);
   _tree->SetBranchAddress("fMDbarCand1", &mDbarCand1);
@@ -399,10 +400,11 @@ void InvMassFitter2D::set1DParameters(const RooArgSet *vars1D, double const &ref
 void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
 {
   const RooArgSet *vars = dataset->get();
+  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
   RooRealVar *massCand1 = dynamic_cast<RooRealVar *>(vars->find("fMCand1"));
   RooRealVar *massCand2 = dynamic_cast<RooRealVar *>(vars->find("fMCand2"));
-  RooRealVar *ptCand1 = dynamic_cast<RooRealVar *>(vars->find("fPtCand1"));
-  RooRealVar *ptCand2 = dynamic_cast<RooRealVar *>(vars->find("fPtCand2"));
+  RooRealVar *ptCand1 = dynamic_cast<RooRealVar *>(vars->find("fPhiCand1"));
+  RooRealVar *ptCand2 = dynamic_cast<RooRealVar *>(vars->find("fPhiCand2"));
   RooRealVar *yCand1 = dynamic_cast<RooRealVar *>(vars->find("fYCand1"));
   RooRealVar *yCand2 = dynamic_cast<RooRealVar *>(vars->find("fYCand2"));
 
@@ -1638,6 +1640,7 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
         return;
     }
   // Get inv. mass, pt and y of the candidates
+  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
   RooRealVar *massCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fMCand1"));
   RooRealVar *massCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fMCand2"));
   RooRealVar *ptCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPtCand1"));
@@ -1675,6 +1678,7 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
       continue;
     }
 
+    ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
     ptCand1->setVal(row->getRealValue("fPtCand1"));
     ptCand2->setVal(row->getRealValue("fPtCand2"));
     yCand1->setVal(row->getRealValue("fYCand1"));
@@ -1891,6 +1895,7 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
       continue;
     }
 
+    ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
     ptCand1->setVal(row->getRealValue("fPtCand1"));
     ptCand2->setVal(row->getRealValue("fPtCand2"));
     yCand1->setVal(row->getRealValue("fYCand1"));
@@ -1992,6 +1997,8 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
     double m2    = static_cast<RooRealVar*>(row->find("fMCand2"))->getVal();
 
     double ptPair = static_cast<RooRealVar*>(row->find("fPtPair"))->getVal();
+
+    cout << "phi: " << phi1 << ", pt: " << pt1 << endl;
 
     double deltaPt = pt1 - pt2;
 

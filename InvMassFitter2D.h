@@ -46,7 +46,11 @@ class InvMassFitter2D {
         void setEfficiencyMap(TH2F *h);
         // Functions for checks and calculations
         double calculateWeights(double const& y, double const& pt);
-        void analyseKinematicDistributions(TFile *fout);
+        void analyseKinematicDistributions(TFile *fout, RooDataSet *dataset, const char *suffix);
+        void selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgnPdfCand2,RooAbsPdf* &bkgPdfCand1,
+                                RooAbsPdf* &bkgPdfCand2, RooAbsPdf* &reflPdfCand1, RooAbsPdf* &reflPdfCand2);
+        void fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooRealVar& massVar, RooDataSet* dataset,
+                                   const std::string& candidateName, const std::string& plotFilename);
         //double calculateIntegratedEfficiency();
         ROOT::Math::PxPyPzMVector createLorentzVector(double const& phi, double const& y, double const& pt, double const& m);
         RooRealVar *getYieldInRange(RooFitResult *fitResult, RooRealVar *massCand1, RooRealVar *massCand2, RooProdPdf function, RooFormulaVar nCands, TString range);

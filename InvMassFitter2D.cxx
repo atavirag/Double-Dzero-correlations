@@ -552,92 +552,7 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   RooAbsPdf *reflPdfCand1;
   RooAbsPdf *reflPdfCand2;
 
-  // Select signal function
-  if (_sgnFuncOption == "gaus")
-  {
-    cout << "Signal function chosen: GAUSSIAN" << endl;
-    sgnPdfCand1 = _workspace.pdf("sgnFuncGausCand1");
-    sgnPdfCand2 = _workspace.pdf("sgnFuncGausCand2");
-  }
-  else if (_sgnFuncOption == "CB")
-  {
-    cout << "Signal function chosen: BIFURCATED CRYSTAL BALL" << endl;
-    sgnPdfCand1 = _workspace.pdf("sgnFuncCBCand1");
-    sgnPdfCand2 = _workspace.pdf("sgnFuncCBCand2");
-  }
-  else
-  {
-    cerr << "ERROR: signal function not supported! \n Available options: gaus, CB. \n Exit!" << endl;
-    return;
-  }
-
-  if (!sgnPdfCand1 || !sgnPdfCand2)
-  {
-    cerr << "ERROR: sgnPdf not found!" << endl;
-    return;
-  }
-
-  // Select background function
-  if (_bkgFuncOption == "expo")
-  {
-    cout << "Background function chosen: EXPONENTIAL" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncExpoCand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncExpoCand2");
-  }
-  else if (_bkgFuncOption == "poly1")
-  {
-    cout << "Background function chosen: POLY 1" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly1Cand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly1Cand2");
-  }
-  else if (_bkgFuncOption == "poly2")
-  {
-    cout << "Background function chosen: POLY 2" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly2Cand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly2Cand2");
-  }
-  else if (_bkgFuncOption == "poly3")
-  {
-    cout << "Background function chosen: POLY 3" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly3Cand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly3Cand2");
-  }
-  else
-  {
-    cerr << "ERROR: background function not supported! \n Available options: expo, poly1, poly2, poly3. \n Exit!" << endl;
-    return;
-  }
-
-  if (!bkgPdfCand1 || !bkgPdfCand2)
-  {
-    cerr << "ERROR: bkgPdf function not found!" << endl;
-    return;
-  }
-
-  // Select reflection function
-  if (_reflFuncOption == "gaus")
-  {
-    cout << "Reflected function chosen: GAUSSIAN" << endl;
-    reflPdfCand1 = _workspace.pdf("reflFuncGausCand1");
-    reflPdfCand2 = _workspace.pdf("reflFuncGausCand2");
-  }
-  else if (_reflFuncOption == "doubleGaus")
-  {
-    cout << "Reflected function chosen: DOUBLE GAUSSIAN" << endl;
-    reflPdfCand1 = _workspace.pdf("reflFuncDoubleGausCand1");
-    reflPdfCand2 = _workspace.pdf("reflFuncDoubleGausCand2");
-  }
-  else
-  {
-    cerr << "ERROR: refl function not supported! \n Available options: gaus, doubleGaus. \n Exit!" << endl;
-    return;
-  }
-
-  if (!reflPdfCand1 || !reflPdfCand2)
-  {
-    cerr << "ERROR: reflPdf function not found!" << endl;
-    return;
-  }
+  selectFitFunctions(sgnPdfCand1, sgnPdfCand2, bkgPdfCand1, bkgPdfCand2, reflPdfCand1, reflPdfCand2);
 
   /// ----------------------------------------------------------
   /// ------------ LOAD AND FIX PARAMETERS ---------------------
@@ -1241,7 +1156,8 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   // -- Plot pT distributions before and after correcting by efficiencies --
   // -----------------------------------------------------------------------
 
-  analyseKinematicDistributions(fout);
+  analyseKinematicDistributions(fout, dataset, "beforeEffs");
+  analyseKinematicDistributions(fout, weightedDataset, "afterEffs");
 
   // Create a frame for ptCand1 with a specified range and number of bins
   RooPlot *framePtCand1 = ptCand1->frame(RooFit::Bins(50), RooFit::Range(ptCand1->getMin(), ptCand1->getMax()));
@@ -1478,14 +1394,8 @@ void InvMassFitter2D::plotProjectionsAfterFit(RooProdPdf *model, RooDataSet *dat
   c_proj->cd(1); // Go to the first pad
   frameCand1->SetXTitle("M(K#pi) (GeV/#it{c}^{2})");
   frameCand1->SetYTitle("Counts per 5 MeV/#it{c}^{2}");
-
   frameCand1->GetXaxis()->SetTitleSize(0.05); // Set X-axis title size
-  frameCand1->GetXaxis()->SetTitleSize(0.05); // Set X-axis title size
-
   frameCand1->GetYaxis()->SetTitleSize(0.05); // Set Y-axis title size
-  frameCand1->GetYaxis()->SetTitleSize(0.05); // Set Y-axis title size
-  // frameCand1->GetYaxis()->SetLabelSize(0.05); // Set Y-axis label size
-  // frameCand1->GetYaxis()->SetLabelSize(0.05); // Set Y-axis label size
   frameCand1->Draw();
   // Draw the legend on the canvas
   legend->Draw();
@@ -1494,15 +1404,10 @@ void InvMassFitter2D::plotProjectionsAfterFit(RooProdPdf *model, RooDataSet *dat
   c_proj->cd(2); // Go to the second pad
   frameCand2->SetYTitle("Counts per 5 MeV/#it{c}^{2}");
   frameCand2->SetXTitle("M(K#pi) (GeV/#it{c}^{2})");
-
   frameCand2->GetXaxis()->SetTitleSize(0.05); // Set X-axis title size
-  frameCand2->GetXaxis()->SetTitleSize(0.05); // Set X-axis title size
-
   frameCand2->GetYaxis()->SetTitleSize(0.05); // Set Y-axis title size
-  frameCand2->GetYaxis()->SetTitleSize(0.05); // Set Y-axis title size
-  // frameCand2->GetYaxis()->SetLabelSize(0.05); // Set Y-axis label size
-  // frameCand2->GetYaxis()->SetLabelSize(0.05); // Set Y-axis label size
   frameCand2->Draw();
+
   if (doReflections)
   {
     legend_2->Draw();
@@ -1631,9 +1536,9 @@ ROOT::Math::PxPyPzMVector InvMassFitter2D::createLorentzVector(double const &phi
 
 // Function to analyse and compare the pT and y distributions of my candidates
 // in a sideband region and the signal region after subtracting the background
-void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
+void InvMassFitter2D::analyseKinematicDistributions(TFile *fout, RooDataSet *dataset, const char *suffix)
 {
-  RooDataSet *dataset = dynamic_cast<RooDataSet *>(_workspace.data("data"));
+  //RooDataSet *dataset = dynamic_cast<RooDataSet *>(_workspace.data("data"));
   if (!dataset)
     {
         cerr << "ERROR: dataset not found!" << endl;
@@ -1648,19 +1553,40 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
   RooRealVar *yCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fYCand2"));
   RooRealVar *phiCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPhiCand1"));
   RooRealVar *phiCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPhiCand2"));
+  RooRealVar *ptPair = dynamic_cast<RooRealVar *>(dataset->get()->find("fPtPair"));
+
+  massCand1->setRange(_massMin, _massMax);
+  massCand2->setRange(_massMin, _massMax);
 
   // Create formula variables for deltaPt and deltaY
   RooRealVar deltaPt("deltaPt", "ptCand1 - ptCand2", 0., -24.0, 24.0);
   RooRealVar deltaY("deltaY", "yCand1 - yCand2", 0., -2.0, 2.0);
-  RooRealVar deltaPhi("deltaPhi", "phiCand1 - phiCand2", 0., -4.0, 4.0);
+  RooRealVar deltaPhi("deltaPhi", "phiCand1 - phiCand2", 0., -10.0, 10.0);
 
   // Create a set of the variables for the new dataset
-  RooArgSet vars(*ptCand1, *ptCand2, *yCand1, *yCand2, *phiCand1, *phiCand2, deltaPt, deltaY, deltaPhi);
+  RooArgSet vars(*massCand1, *massCand2, *ptCand1, *ptCand2, *yCand1, *yCand2, *phiCand1, *phiCand2, *ptPair, deltaPt, deltaY, deltaPhi);
 
   RooRealVar *mean = _workspace.var("mean");
   RooRealVar *sigma = _workspace.var("sigma");
   RooRealVar *meanCand2 = _workspace.var("meanCand2");
   RooRealVar *sigmaCand2 = _workspace.var("sigmaCand2");
+
+  TH1F* hPtPair = new TH1F("hPtPair", Form("Pair Pt distribution_%s", suffix), 100, 0, 15);
+  TH2F* hPtPairVsDeltaPt = new TH2F(Form("ptPairVsDeltaPtHist_%s", suffix), "Pair Pt vs. delta Pt distribution", 75, 0, 15, 30, -10, 10);
+  TH2F* hPtPairVsDeltaY = new TH2F(Form("ptPairVsDeltaYHist_%s", suffix), "Pair Pt vs. delta Y distribution", 75, 0, 15, 30, -1.2, 1.2);
+  TH2F* hPtPairVsDeltaPhi = new TH2F(Form("ptPairVsDeltaPhiHist_%s", suffix), "Pair Pt vs. delta Phi distribution", 75, 0, 15, 28, -7., 7.);
+
+  TH2F* hPtPairVsDeltaPt_02 = new TH2F(Form("ptPairVsDeltaPtHist_0-2_%s", suffix), "Pair Pt vs. delta Pt distribution", 20, 0, 2, 25, -2., 2.);
+  TH2F* hPtPairVsDeltaY_02 = new TH2F(Form("ptPairVsDeltaYHist_0-2_%s", suffix), "Pair Pt vs. delta Y distribution", 20, 0, 2, 30, -1.2, 1.2);
+  TH2F* hPtPairVsDeltaPhi_02 = new TH2F(Form("ptPairVsDeltaPhiHist_0-2_%s", suffix), "Pair Pt vs. delta Phi distribution", 20, 0, 2, 28, -7., 7.);
+
+  TH2F* hPtPairVsAbsDeltaPt = new TH2F(Form("ptPairVsAbsDeltaPtHist_%s", suffix), "Pair Pt vs. |delta Pt| distribution", 75, 0, 15, 30, 0, 10);
+  TH2F* hPtPairVsAbsDeltaY = new TH2F(Form("ptPairVsAbsDeltaYHist_%s", suffix), "Pair Pt vs. |delta Y| distribution", 75, 0, 15, 30, 0., 1.2);
+  TH2F* hPtPairVsAbsDeltaPhi = new TH2F(Form("ptPairVsAbsDeltaPhiHist_%s", suffix), "Pair Pt vs. |delta Phi| distribution", 75, 0, 15, 28, 0., 7.);
+
+  TH2F* hPtPairVsAbsDeltaPt_02 = new TH2F(Form("ptPairVsAbsDeltaPtHist_0-2_%s", suffix), "Pair Pt vs. |delta Pt| distribution", 20, 0, 2, 25, 0, 2);
+  TH2F* hPtPairVsAbsDeltaY_02 = new TH2F(Form("ptPairVsAbsDeltaYHist_0-2_%s", suffix), "Pair Pt vs. |delta Y| distribution", 20, 0, 2, 30, 0, 1.2);
+  TH2F* hPtPairVsAbsDeltaPhi_02 = new TH2F(Form("ptPairVsAbsDeltaPhiHist_0-2_%s", suffix), "Pair Pt vs. |delta Phi| distribution", 20, 0, 2, 28, 0., 7.);
 
   // Create dataset in sideband region
   RooDataSet *datasetSidebandRegion = new RooDataSet("datasetSidebandRegion", "datasetSidebandRegion", vars);
@@ -1677,12 +1603,15 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
       continue;
     }
 
+    massCand1->setVal(row->getRealValue("fMCand1"));
+    massCand2->setVal(row->getRealValue("fMCand2"));
     ptCand1->setVal(row->getRealValue("fPtCand1"));
     ptCand2->setVal(row->getRealValue("fPtCand2"));
     yCand1->setVal(row->getRealValue("fYCand1"));
     yCand2->setVal(row->getRealValue("fYCand2"));
     phiCand1->setVal(row->getRealValue("fPhiCand1"));
     phiCand2->setVal(row->getRealValue("fPhiCand2"));
+    ptPair->setVal(row->getRealValue("fPtPair"));
 
     // Calculate deltaPt and deltaY
     double deltaPtValue = ptCand1->getVal() - ptCand2->getVal();
@@ -1705,181 +1634,15 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
   RooAbsPdf *bkgPdfCand2;
   RooAbsPdf *sgnPdfCand1;
   RooAbsPdf *sgnPdfCand2;
+  RooAbsPdf *reflPdfCand1;
+  RooAbsPdf *reflPdfCand2;
 
-  // Select signal function
-  if (_sgnFuncOption == "gaus")
-  {
-    cout << "Signal function chosen: GAUSSIAN" << endl;
-    sgnPdfCand1 = _workspace.pdf("sgnFuncGausCand1");
-    sgnPdfCand2 = _workspace.pdf("sgnFuncGausCand2");
-  }
-  else if (_sgnFuncOption == "CB")
-  {
-    cout << "Signal function chosen: BIFURCATED CRYSTAL BALL" << endl;
-    sgnPdfCand1 = _workspace.pdf("sgnFuncCBCand1");
-    sgnPdfCand2 = _workspace.pdf("sgnFuncCBCand2");
-  }
-  else
-  {
-    cerr << "ERROR: signal function not supported! \n Available options: gaus, CB. \n Exit!" << endl;
-    return;
-  }
-
-  if (!sgnPdfCand1 || !sgnPdfCand2)
-  {
-    cerr << "ERROR: sgnPdf not found!" << endl;
-    return;
-  }
-
-  // Select background function
-  if (_bkgFuncOption == "expo")
-  {
-    cout << "Background function chosen: EXPONENTIAL" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncExpoCand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncExpoCand2");
-  }
-  else if (_bkgFuncOption == "poly1")
-  {
-    cout << "Background function chosen: POLY 1" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly1Cand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly1Cand2");
-  }
-  else if (_bkgFuncOption == "poly2")
-  {
-    cout << "Background function chosen: POLY 2" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly2Cand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly2Cand2");
-  }
-  else if (_bkgFuncOption == "poly3")
-  {
-    cout << "Background function chosen: POLY 3" << endl;
-    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly3Cand1");
-    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly3Cand2");
-  }
-  else
-  {
-    cerr << "ERROR: background function not supported! \n Available options: expo, poly2, poly3. \n Exit!" << endl;
-    return;
-  }
-
-  if (!bkgPdfCand1 || !bkgPdfCand2)
-  {
-    cerr << "ERROR: bkgPdf function not found!" << endl;
-    return;
-  }
+  selectFitFunctions(sgnPdfCand1, sgnPdfCand2, bkgPdfCand1, bkgPdfCand2, reflPdfCand1, reflPdfCand2);
 
   RooArgSet normSet(*massCand1, *massCand2);
 
-  // Define the number of signal and background events for candidate 1
-  RooRealVar nSgnCand1("nSgnCand1", "Number of signal events of candidate 1", 10000, 0, 100000);
-  RooRealVar nBkgCand1("nBkgCand1", "Number of background events of candidate 1", 50000, 0, 200000);
-
-  // Create the composite model for candidate 1
-  RooAddPdf modelCand1("modelCand1", "Signal + Background of candidate 1", RooArgList(*sgnPdfCand1, *bkgPdfCand1), RooArgList(nSgnCand1, nBkgCand1));
-
-  // Fit the model to the data for candidate 1
-  RooFitResult* fitResultCand1 = modelCand1.fitTo(*dataset, Save());
-  fitResultCand1->Print("v");
-  if (fitResultCand1->status() != 0) {
-    cout << "Fit did not converge for candidate 1!" << endl;
-  }
-
-  // Plot the fit results for candidate 1
-  plotFitResults(dataset, massCand1, &modelCand1, fitResultCand1, "Fit Result for Candidate 1", "fit_result_cand1");
-
-  // Define the number of signal and background events for candidate 2
-  RooRealVar nSgnCand2("nSgnCand2", "Number of signal events of candidate 2", 10000, 0, 100000);
-  RooRealVar nBkgCand2("nBkgCand2", "Number of background events of candidate 2", 50000, 0, 200000);
-
-  // Create the composite model for candidate 2
-  RooAddPdf modelCand2("modelCand2", "Signal + Background of candidate 2", RooArgList(*sgnPdfCand2, *bkgPdfCand2), RooArgList(nSgnCand2, nBkgCand2));
-
-  // Fit the model to the data for candidate 2
-  RooFitResult* fitResultCand2 = modelCand2.fitTo(*dataset, Save());
-  fitResultCand2->Print("v");
-
-  // Plot the fit results for candidate 2
-  plotFitResults(dataset, massCand2, &modelCand2, fitResultCand2, "Fit Result for Candidate 2", "fit_result_cand2");
-
-  // Create a flag variable
-  RooCategory signalFlagCand1("signalFlagCand1", "Signal or Background Flag");
-  signalFlagCand1.defineType("Signal", 1);
-  signalFlagCand1.defineType("Background", 0);
-
-  RooCategory signalFlagCand2("signalFlagCand2", "Signal or Background Flag");
-  signalFlagCand2.defineType("Signal", 1);
-  signalFlagCand2.defineType("Background", 0);
-
-  // Create a new dataset with the signal flag
-  RooArgSet varsWithFlag(*dataset->get());
-  varsWithFlag.add(signalFlagCand1);
-  varsWithFlag.add(signalFlagCand2);
-  RooDataSet datasetWithFlag("datasetWithFlag", "Dataset with Signal Flags", varsWithFlag);
-
-  double sidebandLeft = mean->getVal() - 4 * sigma->getVal();
-  double sidebandRight = mean->getVal() + 4 * sigma->getVal();
-  double signalLeft = mean->getVal() - 3 * sigma->getVal();
-  double signalRight = mean->getVal() + 3 * sigma->getVal();
-
-  // Iterate over the dataset and set the flag
-  for (int i = 0; i < dataset->numEntries(); ++i) {
-
-      const RooArgSet* row = dataset->get(i);
-      double massValCand1 = row->getRealValue("fMCand1");
-      double massValCand2 = row->getRealValue("fMCand2");
-
-      // Determine if the event is signal or background
-      if (massValCand1 > signalLeft && massValCand1 < signalRight) {
-          // Calculate likelihoods
-          //cout << "mass Cand 1 " << massCand1->getVal() << endl;
-          massCand1->setVal(massValCand1);
-
-          double signalLikelihoodCand1 = sgnPdfCand1->getVal();
-          double backgroundLikelihoodCand1 = bkgPdfCand1->getVal();
-          //double modelLikelihood = modelCand1.getVal();
-          //cout << "modelCand1: " << modelCand1.getVal() << " backgroundLikelihoodCand1: " << bkgPdfCand1->getVal() << endl;
-
-          // Calculate signal probability using likelihood ratio
-          double signalProbCand1 = signalLikelihoodCand1 / (signalLikelihoodCand1 + backgroundLikelihoodCand1);
-
-          // Classify based on probability (e.g., using a threshold)
-          if (signalProbCand1 > 0.5) { // Adjust threshold as needed
-              signalFlagCand1.setLabel("Signal");
-          } else {
-              signalFlagCand1.setLabel("Background");
-          }
-      } else {
-          signalFlagCand1.setLabel("Background");
-      }
-      // Now for cand 2
-      if (massValCand2 > signalLeft && massValCand2 < signalRight) {
-        // Calculate likelihoods
-        massCand2->setVal(massValCand2);
-        double signalLikelihoodCand2 = sgnPdfCand2->getVal(&normSet);
-        double backgroundLikelihoodCand2 = bkgPdfCand2->getVal(&normSet);
-
-        // Calculate signal probability using likelihood ratio
-        double signalProbCand2 = signalLikelihoodCand2 / (signalLikelihoodCand2 + backgroundLikelihoodCand2);
-        //cout << signalLikelihoodCand2 << " bkg likelihood: " << backgroundLikelihoodCand2 << endl;
-
-        // Classify based on probability (e.g., using a threshold)
-        if (signalProbCand2 > 0.5) { // Adjust threshold as needed
-            signalFlagCand2.setLabel("Signal");
-        } else {
-            signalFlagCand2.setLabel("Background");
-        }
-    } else {
-        signalFlagCand2.setLabel("Background");
-    }
-
-      // Add the event with the flag to the new dataset
-      varsWithFlag.setRealValue(massCand1->GetName(), massValCand1);
-      varsWithFlag.setRealValue(massCand2->GetName(), massValCand2);
-      datasetWithFlag.add(varsWithFlag);
-  }
-
-  // Create datasets for signal and background regions based on the flag
-  RooDataSet* signalData = (RooDataSet*)datasetWithFlag.reduce(Cut("signalFlagCand1 == signalFlagCand1::Signal"));
+  fitAndPlot1DCandidate(sgnPdfCand1, bkgPdfCand1, *massCand1, dataset, "Cand1", Form("fit_result_cand1_%s", suffix));
+  fitAndPlot1DCandidate(sgnPdfCand2, bkgPdfCand2, *massCand2, dataset, "Cand2", Form("fit_result_cand2_%s", suffix));
 
   RooDataSet *datasetSignalRegion = new RooDataSet("datasetSignalRegion", "datasetSignalRegion", vars);
   for (int i = 0; i < dataset->numEntries(); ++i)
@@ -1893,14 +1656,17 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
       continue;
     }
 
+    massCand1->setVal(row->getRealValue("fMCand1"));
+    massCand2->setVal(row->getRealValue("fMCand2"));
     ptCand1->setVal(row->getRealValue("fPtCand1"));
     ptCand2->setVal(row->getRealValue("fPtCand2"));
     yCand1->setVal(row->getRealValue("fYCand1"));
     yCand2->setVal(row->getRealValue("fYCand2"));
     phiCand1->setVal(row->getRealValue("fPhiCand1"));
     phiCand2->setVal(row->getRealValue("fPhiCand2"));
+    ptPair->setVal(row->getRealValue("fPtPair"));
 
-    // Calculate deltaPt and deltaY
+    // Calculate deltaPt, deltaPhi, and deltaY
     double deltaPtValue = ptCand1->getVal() - ptCand2->getVal();
     double deltaYValue = yCand1->getVal() - yCand2->getVal();
     double deltaPhiValue = phiCand1->getVal() - phiCand2->getVal();
@@ -1910,8 +1676,26 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
     deltaY.setVal(deltaYValue);
     deltaPhi.setVal(deltaPhiValue);
 
-
     datasetSignalRegion->add(vars);
+
+    hPtPair->Fill(ptPair->getVal());  // Fill histogram for each pair
+    hPtPairVsDeltaPt->Fill(ptPair->getVal(), deltaPtValue);
+    hPtPairVsDeltaY->Fill(ptPair->getVal(), deltaYValue);
+    hPtPairVsDeltaPhi->Fill(ptPair->getVal(), deltaPhiValue);
+
+    hPtPairVsAbsDeltaPt->Fill(ptPair->getVal(), abs(deltaPtValue));
+    hPtPairVsAbsDeltaY->Fill(ptPair->getVal(), abs(deltaYValue));
+    hPtPairVsAbsDeltaPhi->Fill(ptPair->getVal(), abs(deltaPhiValue));
+
+    if (ptPair->getVal() <= 2) {
+      hPtPairVsDeltaPt_02->Fill(ptPair->getVal(), deltaPtValue);
+      hPtPairVsDeltaY_02->Fill(ptPair->getVal(), deltaYValue);
+      hPtPairVsDeltaPhi_02->Fill(ptPair->getVal(), deltaPhiValue);
+
+      hPtPairVsAbsDeltaPt_02->Fill(ptPair->getVal(), abs(deltaPtValue));
+      hPtPairVsAbsDeltaY_02->Fill(ptPair->getVal(), abs(deltaYValue));
+      hPtPairVsAbsDeltaPhi_02->Fill(ptPair->getVal(), abs(deltaPhiValue));
+    }
   }
 
   double binWidth = 1.; // Desired bin width
@@ -1925,39 +1709,39 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
   float const nSignal = datasetSignalRegion->sumEntries();
 
   // Create histos with pt distributions
-  TH1F* histSidebandPtCand1 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPtCand1", *ptCand1, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSignalPtCand1 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPtCand1", *ptCand1, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSidebandPtCand2 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPtCand2", *ptCand2, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSignalPtCand2 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPtCand2", *ptCand2, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSidebandPtCand1 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPtCand1_%s", suffix), *ptCand1, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSignalPtCand1 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPtCand1_%s", suffix), *ptCand1, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSidebandPtCand2 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPtCand2_%s", suffix), *ptCand2, Binning(nBins, _ptMin, _ptMax));
+  TH1F* histSignalPtCand2 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPtCand2_%s", suffix), *ptCand2, Binning(nBins, _ptMin, _ptMax));
 
   plotKinematicDistributions(histSidebandPtCand1, histSignalPtCand1, histSidebandPtCand2, histSignalPtCand2,
-                             nSideband, nSignal, "#it{p}_{T} (GeV/#it{c})", "ptDistributions", fout);
+                             nSideband, nSignal, "#it{p}_{T} (GeV/#it{c})", Form("ptDistributions_%s", suffix), fout);
 
   /// --------------------------------------------------------
   /// ------------------- Y DISTRIBUTIONS --------------------
   /// --------------------------------------------------------
 
   // Create histos with y distributions
-  TH1F* histSidebandYCand1 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandYCand1", *yCand1, Binning(20, -0.6, 0.6));
-  TH1F* histSignalYCand1 = (TH1F*)datasetSignalRegion->createHistogram("histSignalYCand1", *yCand1, Binning(20, -0.6, 0.6));
-  TH1F* histSidebandYCand2 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandYCand2", *yCand2, Binning(20, -0.6, 0.6));
-  TH1F* histSignalYCand2 = (TH1F*)datasetSignalRegion->createHistogram("histSignalYCand2", *yCand2, Binning(20, -0.6, 0.6));
+  TH1F* histSidebandYCand1 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandYCand1_%s", suffix), *yCand1, Binning(20, -0.6, 0.6));
+  TH1F* histSignalYCand1 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalYCand1_%s", suffix), *yCand1, Binning(20, -0.6, 0.6));
+  TH1F* histSidebandYCand2 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandYCand2_%s", suffix), *yCand2, Binning(20, -0.6, 0.6));
+  TH1F* histSignalYCand2 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalYCand2_%s", suffix), *yCand2, Binning(20, -0.6, 0.6));
 
   plotKinematicDistributions(histSidebandYCand1, histSignalYCand1, histSidebandYCand2, histSignalYCand2,
-                             nSideband, nSignal, "#it{y}", "yDistributions", fout);
+                             nSideband, nSignal, "#it{y}", Form("yDistributions_%s", suffix), fout);
 
   /// --------------------------------------------------------
   /// ----------------- PHI DISTRIBUTIONS --------------------
   /// --------------------------------------------------------
 
   // Create histos with phi distributions
-  TH1F* histSidebandPhiCand1 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPhiCand1", *phiCand1, Binning(nBins, 0, 6.5));
-  TH1F* histSignalPhiCand1 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPhiCand1", *phiCand1, Binning(nBins, 0, 6.5));
-  TH1F* histSidebandPhiCand2 = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandPhiCand2", *phiCand2, Binning(nBins, 0, 6.5));
-  TH1F* histSignalPhiCand2 = (TH1F*)datasetSignalRegion->createHistogram("histSignalPhiCand2", *phiCand2, Binning(nBins, 0, 6.5));
+  TH1F* histSidebandPhiCand1 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPhiCand1_%s", suffix), *phiCand1, Binning(nBins, 0, 6.5));
+  TH1F* histSignalPhiCand1 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPhiCand1_%s", suffix), *phiCand1, Binning(nBins, 0, 6.5));
+  TH1F* histSidebandPhiCand2 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPhiCand2_%s", suffix), *phiCand2, Binning(nBins, 0, 6.5));
+  TH1F* histSignalPhiCand2 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPhiCand2_%s", suffix), *phiCand2, Binning(nBins, 0, 6.5));
 
   plotKinematicDistributions(histSidebandPhiCand1, histSignalPhiCand1, histSidebandPhiCand2, histSignalPhiCand2,
-                             nSideband, nSignal, "#phi", "phiDistributions", fout);
+                             nSideband, nSignal, "#phi", Form("phiDistributions_%s", suffix), fout);
 
   /// --------------------------------------------------------------
   /// ------------------ DELTA Y, PT DISTRIBUTIONS --------------------
@@ -1966,80 +1750,116 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout)
   gROOT->SetBatch(kTRUE);
 
   // Create histos with pt distributions
-  TH1F* histSidebandDeltaPt = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandDeltaPt", deltaPt, Binning(40, -_ptMax, _ptMax));
-  TH1F* histSidebandDeltaY = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandDeltaY", deltaY, Binning(40, -1.0, 1.0));
-  TH1F* histSignalDeltaPt = (TH1F*)datasetSignalRegion->createHistogram("histSignalDeltaPt", deltaPt, Binning(40, -_ptMax, _ptMax));
-  TH1F* histSignalDeltaY = (TH1F*)datasetSignalRegion->createHistogram("histSignalDeltaY", deltaY, Binning(40, -1.0, 1.0));
-  TH1F* histSidebandDeltaPhi = (TH1F*)datasetSidebandRegion->createHistogram("histSidebandDeltaPhi", deltaPhi, Binning(40, -2.0, 2.0));
-  TH1F* histSignalDeltaPhi = (TH1F*)datasetSignalRegion->createHistogram("histSignalDeltaPhi", deltaPhi, Binning(40, -2.0, 2.0));
+  TH1F* histSidebandDeltaPt = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandDeltaPt_%s", suffix), deltaPt, Binning(40, -_ptMax, _ptMax));
+  TH1F* histSidebandDeltaY = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandDeltaY_%s", suffix), deltaY, Binning(40, -1.0, 1.0));
+  TH1F* histSignalDeltaPt = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalDeltaPt_%s", suffix), deltaPt, Binning(40, -_ptMax, _ptMax));
+  TH1F* histSignalDeltaY = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalDeltaY_%s", suffix), deltaY, Binning(40, -1.0, 1.0));
+  TH1F* histSidebandDeltaPhi = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandDeltaPhi_%s", suffix), deltaPhi, Binning(40, -2.0, 2.0));
+  TH1F* histSignalDeltaPhi = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalDeltaPhi_%s", suffix), deltaPhi, Binning(40, -2.0, 2.0));
 
   plotDeltaKinematicDistributions(histSidebandDeltaPt, histSignalDeltaPt, histSidebandDeltaY, histSignalDeltaY,
-                                  histSignalDeltaPhi, histSidebandDeltaPhi, nSideband, nSignal, "deltaDistributions", fout);
+                                  histSignalDeltaPhi, histSidebandDeltaPhi, nSideband, nSignal, Form("deltaDistributions_%s", suffix), fout);
 
-  TH1F* hPtPair = new TH1F("hPtPair", "Pair Pt distribution", 100, 0, 15);
-  TH2F* hPtPairVsDeltaPt = new TH2F("ptPairVsDeltaPtHist", "Pair Pt vs. delta Pt distribution", 75, 0, 15, 30, -10, 10);
-  TH2F* hPtPairVsDeltaY = new TH2F("ptPairVsDeltaYHist", "Pair Pt vs. delta Y distribution", 75, 0, 15, 30, -2, 2);
-  TH2F* hPtPairVsDeltaPhi = new TH2F("ptPairVsDeltaPhiHist", "Pair Pt vs. delta Phi distribution", 75, 0, 15, 30, -6, 6);
-
-  // Loop over all pairs
-  for (size_t i = 0; i < dataset->numEntries(); ++i) {
-    const RooArgSet* row = dataset->get(i);
-
-    double phi1  = static_cast<RooRealVar*>(row->find("fPhiCand1"))->getVal();
-    double y1    = static_cast<RooRealVar*>(row->find("fYCand1"))->getVal();
-    double pt1   = static_cast<RooRealVar*>(row->find("fPtCand1"))->getVal();
-    double m1    = static_cast<RooRealVar*>(row->find("fMCand1"))->getVal();
-
-    double phi2  = static_cast<RooRealVar*>(row->find("fPhiCand2"))->getVal();
-    double y2    = static_cast<RooRealVar*>(row->find("fYCand2"))->getVal();
-    double pt2   = static_cast<RooRealVar*>(row->find("fPtCand2"))->getVal();
-    double m2    = static_cast<RooRealVar*>(row->find("fMCand2"))->getVal();
-
-    double ptPair = static_cast<RooRealVar*>(row->find("fPtPair"))->getVal();
-
-    double deltaPt = pt1 - pt2;
-    double deltaY = y1 - y2;
-    double deltaPhi = phi1 - phi2;
-
-    hPtPair->Fill(ptPair);  // Fill histogram for each pair
-    hPtPairVsDeltaPt->Fill(ptPair, deltaPt);
-    hPtPairVsDeltaY->Fill(ptPair, deltaY);
-    hPtPairVsDeltaPhi->Fill(ptPair, deltaPhi);
-
-  }
-  TCanvas *cPtPair = new TCanvas("cPtPair", "cPtPair", 800, 600);
+  TCanvas *cPtPair = new TCanvas(Form("cPtPair_%s", suffix), Form("cPtPair_%s", suffix), 800, 600);
   hPtPair->SetTitle(Form("#it{p}_{T} of the D-meson pair"));
   hPtPair->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD} (GeV/#it{c})"));
   hPtPair->GetYaxis()->SetTitle(Form("Entries"));
   hPtPair->Draw();
-  cPtPair->SaveAs("ptPairHist.png");
+  cPtPair->SaveAs(Form("ptPairHist_%s.png", suffix));
 
-  TCanvas *cPtPairVsDeltaPt = new TCanvas("cPtPairVsDeltaPt", "cPtPairVsDeltaPt", 800, 600);
+  TCanvas *cPtPairVsDeltaPt = new TCanvas(Form("cPtPairVsDeltaPt_%s", suffix), Form("cPtPairVsDeltaPt_%s", suffix), 800, 600);
   hPtPairVsDeltaPt->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
   hPtPairVsDeltaPt->GetYaxis()->SetTitle(Form("#Delta#it{p}_{T} (GeV/#it{c})"));
   hPtPairVsDeltaPt->Draw("colz");
-  cPtPairVsDeltaPt->SaveAs("ptPairVsDeltaPtHist.png");
+  cPtPairVsDeltaPt->SaveAs(Form("ptPairVsDeltaPtHist_%s.png", suffix));
 
-  TCanvas *cPtPairVsDeltaPhi = new TCanvas("cPtPairVsDeltaPhi", "cPtPairVsDeltaPhi", 800, 600);
+  TCanvas *cPtPairVsDeltaPhi = new TCanvas(Form("cPtPairVsDeltaPhi_%s", suffix), Form("cPtPairVsDeltaPhi_%s", suffix), 800, 600);
   hPtPairVsDeltaPhi->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaPhi->GetYaxis()->SetTitle(Form("#Delta#phi)"));
+  hPtPairVsDeltaPhi->GetYaxis()->SetTitle(Form("#Delta#phi"));
   hPtPairVsDeltaPhi->Draw("colz");
-  cPtPairVsDeltaPhi->SaveAs("ptPairVsDeltaPhiHist.png");
+  cPtPairVsDeltaPhi->SaveAs(Form("ptPairVsDeltaPhiHist_%s.png", suffix));
 
-  TCanvas *cPtPairVsDeltaY = new TCanvas("cPtPairVsDeltaY", "cPtPairVsDeltaY", 800, 600);
+  TCanvas *cPtPairVsDeltaY = new TCanvas(Form("cPtPairVsDeltaY_%s", suffix), Form("cPtPairVsDeltaY_%s", suffix), 800, 600);
   hPtPairVsDeltaY->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaY->GetYaxis()->SetTitle(Form("#Delta#it{y})"));
+  hPtPairVsDeltaY->GetYaxis()->SetTitle(Form("#Delta#it{y}"));
   hPtPairVsDeltaY->Draw("colz");
-  cPtPairVsDeltaY->SaveAs("ptPairVsDeltaYHist.png");
+  cPtPairVsDeltaY->SaveAs(Form("ptPairVsDeltaYHist_%s.png", suffix));
+
+  TCanvas *cPtPairVsAbsDeltaPt = new TCanvas(Form("cPtPairVsAbsDeltaPt_%s", suffix), Form("cPtPairVsAbsDeltaPt_%s", suffix), 800, 600);
+  hPtPairVsAbsDeltaPt->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsAbsDeltaPt->GetYaxis()->SetTitle(Form("|#Delta#it{p}_{T}| (GeV/#it{c})"));
+  hPtPairVsAbsDeltaPt->Draw("colz");
+  cPtPairVsAbsDeltaPt->SaveAs(Form("ptPairVsAbsDeltaPtHist_%s.png", suffix));
+
+  TCanvas *cPtPairVsAbsDeltaPhi = new TCanvas(Form("cPtPairVsAbsDeltaPhi_%s", suffix), Form("cPtPairVsAbsDeltaPhi_%s", suffix), 800, 600);
+  hPtPairVsAbsDeltaPhi->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsAbsDeltaPhi->GetYaxis()->SetTitle(Form("|#Delta#phi|"));
+  hPtPairVsAbsDeltaPhi->Draw("colz");
+  cPtPairVsAbsDeltaPhi->SaveAs(Form("ptPairVsAbsDeltaPhiHist_%s.png", suffix));
+
+  TCanvas *cPtPairVsAbsDeltaY = new TCanvas(Form("cPtPairVsAbsDeltaY_%s", suffix), Form("cPtPairVsAbsDeltaY_%s", suffix), 800, 600);
+  hPtPairVsAbsDeltaY->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsAbsDeltaY->GetYaxis()->SetTitle(Form("|#Delta#it{y}|"));
+  hPtPairVsAbsDeltaY->Draw("colz");
+  cPtPairVsAbsDeltaY->SaveAs(Form("ptPairVsAbsDeltaYHist_%s.png", suffix));
+
+  TCanvas *cPtPairVsDeltaPt_02 = new TCanvas(Form("cPtPairVsDeltaPt_02_%s", suffix), Form("cPtPairVsDeltaPt_02_%s", suffix), 800, 600);
+  hPtPairVsDeltaPt_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsDeltaPt_02->GetYaxis()->SetTitle(Form("#Delta#it{p}_{T} (GeV/#it{c})"));
+  hPtPairVsDeltaPt_02->Draw("colz");
+  cPtPairVsDeltaPt_02->SaveAs(Form("ptPairVsDeltaPtHist_02_%s.png", suffix));
+
+  TCanvas *cPtPairVsDeltaPhi_02 = new TCanvas(Form("cPtPairVsDeltaPhi_02_%s", suffix), Form("cPtPairVsDeltaPhi_02_%s", suffix), 800, 600);
+  hPtPairVsDeltaPhi_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsDeltaPhi_02->GetYaxis()->SetTitle(Form("#Delta#phi"));
+  hPtPairVsDeltaPhi_02->Draw("colz");
+  cPtPairVsDeltaPhi_02->SaveAs(Form("ptPairVsDeltaPhiHist_02_%s.png", suffix));
+
+  TCanvas *cPtPairVsDeltaY_02 = new TCanvas(Form("cPtPairVsDeltaY_02_%s", suffix), Form("cPtPairVsDeltaY_02_%s", suffix), 800, 600);
+  hPtPairVsDeltaY_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsDeltaY_02->GetYaxis()->SetTitle(Form("#Delta#it{y}"));
+  hPtPairVsDeltaY_02->Draw("colz");
+  cPtPairVsDeltaY_02->SaveAs(Form("ptPairVsDeltaYHist_02_%s.png", suffix));
+
+  TCanvas *cPtPairVsAbsDeltaPt_02 = new TCanvas(Form("cPtPairVsAbsDeltaPt_02_%s", suffix), Form("cPtPairVsAbsDeltaPt_02_%s", suffix), 800, 600);
+  hPtPairVsAbsDeltaPt_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsAbsDeltaPt_02->GetYaxis()->SetTitle(Form("#Delta#it{p}_{T} (GeV/#it{c})"));
+  hPtPairVsAbsDeltaPt_02->Draw("colz");
+  cPtPairVsAbsDeltaPt_02->SaveAs(Form("ptPairVsAbsDeltaPtHist_02_%s.png", suffix));
+
+  TCanvas *cPtPairVsAbsDeltaPhi_02 = new TCanvas(Form("cPtPairVsAbsDeltaPhi_02_%s", suffix), Form("cPtPairVsAbsDeltaPhi_02_%s", suffix), 800, 600);
+  hPtPairVsAbsDeltaPhi_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsAbsDeltaPhi_02->GetYaxis()->SetTitle(Form("|#Delta#phi|"));
+  hPtPairVsAbsDeltaPhi_02->Draw("colz");
+  cPtPairVsAbsDeltaPhi_02->SaveAs(Form("ptPairVsAbsDeltaPhiHist_02_%s.png", suffix));
+
+  TCanvas *cPtPairVsAbsDeltaY_02 = new TCanvas(Form("cPtPairVsAbsDeltaY_02_%s", suffix), Form("cPtPairVsAbsDeltaY_02_%s", suffix), 800, 600);
+  hPtPairVsAbsDeltaY_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
+  hPtPairVsAbsDeltaY_02->GetYaxis()->SetTitle(Form("|#Delta#it{y}|"));
+  hPtPairVsAbsDeltaY_02->Draw("colz");
+  cPtPairVsAbsDeltaY_02->SaveAs(Form("ptPairVsAbsDeltaYHist_02_%s.png", suffix));
 
   fout->cd();
   cPtPair->Write();
   cPtPairVsDeltaPt->Write();
   cPtPairVsDeltaY->Write();
   cPtPairVsDeltaPhi->Write();
+
   hPtPairVsDeltaPt->Write();
   hPtPairVsDeltaY->Write();
   hPtPairVsDeltaPhi->Write();
+
+  hPtPairVsAbsDeltaPt->Write();
+  hPtPairVsAbsDeltaY->Write();
+  hPtPairVsAbsDeltaPhi->Write();
+
+  hPtPairVsDeltaPt_02->Write();
+  hPtPairVsDeltaY_02->Write();
+  hPtPairVsDeltaPhi_02->Write();
+
+  hPtPairVsAbsDeltaPt_02->Write();
+  hPtPairVsAbsDeltaY_02->Write();
+  hPtPairVsAbsDeltaPhi_02->Write();
 
 }
 
@@ -2215,3 +2035,203 @@ void InvMassFitter2D::plotDeltaKinematicDistributions(TH1F* histSidebandDeltaPt,
   histSidebandDeltaPhi->Write();
   canvas->Close();
 }
+
+void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgnPdfCand2,RooAbsPdf* &bkgPdfCand1,
+                                         RooAbsPdf* &bkgPdfCand2, RooAbsPdf* &reflPdfCand1, RooAbsPdf* &reflPdfCand2) {
+  // Select signal function
+  if (_sgnFuncOption == "gaus")
+  {
+    cout << "Signal function chosen: GAUSSIAN" << endl;
+    sgnPdfCand1 = _workspace.pdf("sgnFuncGausCand1");
+    sgnPdfCand2 = _workspace.pdf("sgnFuncGausCand2");
+  }
+  else if (_sgnFuncOption == "CB")
+  {
+    cout << "Signal function chosen: BIFURCATED CRYSTAL BALL" << endl;
+    sgnPdfCand1 = _workspace.pdf("sgnFuncCBCand1");
+    sgnPdfCand2 = _workspace.pdf("sgnFuncCBCand2");
+  }
+  else
+  {
+    cerr << "ERROR: signal function not supported! \n Available options: gaus, CB. \n Exit!" << endl;
+    return;
+  }
+
+  if (!sgnPdfCand1 || !sgnPdfCand2)
+  {
+    cerr << "ERROR: sgnPdf not found!" << endl;
+    return;
+  }
+
+  // Select background function
+  if (_bkgFuncOption == "expo")
+  {
+    cout << "Background function chosen: EXPONENTIAL" << endl;
+    bkgPdfCand1 = _workspace.pdf("bkgFuncExpoCand1");
+    bkgPdfCand2 = _workspace.pdf("bkgFuncExpoCand2");
+  }
+  else if (_bkgFuncOption == "poly1")
+  {
+    cout << "Background function chosen: POLY 1" << endl;
+    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly1Cand1");
+    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly1Cand2");
+  }
+  else if (_bkgFuncOption == "poly2")
+  {
+    cout << "Background function chosen: POLY 2" << endl;
+    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly2Cand1");
+    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly2Cand2");
+  }
+  else if (_bkgFuncOption == "poly3")
+  {
+    cout << "Background function chosen: POLY 3" << endl;
+    bkgPdfCand1 = _workspace.pdf("bkgFuncPoly3Cand1");
+    bkgPdfCand2 = _workspace.pdf("bkgFuncPoly3Cand2");
+  }
+  else
+  {
+    cerr << "ERROR: background function not supported! \n Available options: expo, poly2, poly3. \n Exit!" << endl;
+    return;
+  }
+
+  if (!bkgPdfCand1 || !bkgPdfCand2)
+  {
+    cerr << "ERROR: bkgPdf not found!" << endl;
+    return;
+  }
+
+  // Select reflection function
+  if (_reflFuncOption == "gaus")
+  {
+    cout << "Reflected function chosen: GAUSSIAN" << endl;
+    reflPdfCand1 = _workspace.pdf("reflFuncGausCand1");
+    reflPdfCand2 = _workspace.pdf("reflFuncGausCand2");
+  }
+  else if (_reflFuncOption == "doubleGaus")
+  {
+    cout << "Reflected function chosen: DOUBLE GAUSSIAN" << endl;
+    reflPdfCand1 = _workspace.pdf("reflFuncDoubleGausCand1");
+    reflPdfCand2 = _workspace.pdf("reflFuncDoubleGausCand2");
+  }
+  else
+  {
+    cerr << "ERROR: refl function not supported! \n Available options: gaus, doubleGaus. \n Exit!" << endl;
+    return;
+  }
+
+  if (!reflPdfCand1 || !reflPdfCand2)
+  {
+    cerr << "ERROR: reflPdf function not found!" << endl;
+    return;
+  }
+}
+
+void InvMassFitter2D::fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooRealVar& massVar, RooDataSet* dataset,
+                                            const std::string& candidateName, const std::string& plotFilename) {
+// Define the number of signal and background events
+RooRealVar nSgn(Form("nSgn%s", candidateName.c_str()),
+Form("Number of signal events of %s", candidateName.c_str()),
+10000, 0, 100000);
+RooRealVar nBkg(Form("nBkg%s", candidateName.c_str()),
+Form("Number of background events of %s", candidateName.c_str()),
+50000, 0, 200000);
+
+// Create the composite model
+RooAddPdf model(Form("model%s", candidateName.c_str()),
+Form("Signal + Background of %s", candidateName.c_str()),
+RooArgList(*sgnPdf, *bkgPdf), RooArgList(nSgn, nBkg));
+
+// Fit the model to the data
+RooFitResult* fitResult = model.fitTo(*dataset, Save());
+fitResult->Print("v");
+if (fitResult->status() != 0) {
+std::cout << "Fit did not converge for " << candidateName << "!" << std::endl;
+}
+
+// Plot the fit results
+std::string title = "Fit Result for " + candidateName;
+plotFitResults(dataset, &massVar, &model, fitResult, title.c_str(), plotFilename.c_str());
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+///////////////// BACKGROUND SUBTRACTION OF SIGNAL REGION /////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+/*   // Create a flag variable
+  RooCategory signalFlagCand1("signalFlagCand1", "Signal or Background Flag");
+  signalFlagCand1.defineType("Signal", 1);
+  signalFlagCand1.defineType("Background", 0);
+
+  RooCategory signalFlagCand2("signalFlagCand2", "Signal or Background Flag");
+  signalFlagCand2.defineType("Signal", 1);
+  signalFlagCand2.defineType("Background", 0);
+
+  // Create a new dataset with the signal flag
+  RooArgSet varsWithFlag(*dataset->get());
+  varsWithFlag.add(signalFlagCand1);
+  varsWithFlag.add(signalFlagCand2);
+  RooDataSet datasetWithFlag("datasetWithFlag", "Dataset with Signal Flags", varsWithFlag);
+
+  double sidebandLeft = mean->getVal() - 4 * sigma->getVal();
+  double sidebandRight = mean->getVal() + 4 * sigma->getVal();
+  double signalLeft = mean->getVal() - 3 * sigma->getVal();
+  double signalRight = mean->getVal() + 3 * sigma->getVal();
+
+  // Iterate over the dataset and set the flag
+  for (int i = 0; i < dataset->numEntries(); ++i) {
+
+      const RooArgSet* row = dataset->get(i);
+      double massValCand1 = row->getRealValue("fMCand1");
+      double massValCand2 = row->getRealValue("fMCand2");
+
+      // Determine if the event is signal or background
+      if (massValCand1 > signalLeft && massValCand1 < signalRight) {
+          // Calculate likelihoods
+          //cout << "mass Cand 1 " << massCand1->getVal() << endl;
+          massCand1->setVal(massValCand1);
+
+          double signalLikelihoodCand1 = sgnPdfCand1->getVal();
+          double backgroundLikelihoodCand1 = bkgPdfCand1->getVal();
+          //double modelLikelihood = modelCand1.getVal();
+          //cout << "modelCand1: " << modelCand1.getVal() << " backgroundLikelihoodCand1: " << bkgPdfCand1->getVal() << endl;
+
+          // Calculate signal probability using likelihood ratio
+          double signalProbCand1 = signalLikelihoodCand1 / (signalLikelihoodCand1 + backgroundLikelihoodCand1);
+
+          // Classify based on probability (e.g., using a threshold)
+          if (signalProbCand1 > 0.5) { // Adjust threshold as needed
+              signalFlagCand1.setLabel("Signal");
+          } else {
+              signalFlagCand1.setLabel("Background");
+          }
+      } else {
+          signalFlagCand1.setLabel("Background");
+      }
+      // Now for cand 2
+      if (massValCand2 > signalLeft && massValCand2 < signalRight) {
+        // Calculate likelihoods
+        massCand2->setVal(massValCand2);
+        double signalLikelihoodCand2 = sgnPdfCand2->getVal(&normSet);
+        double backgroundLikelihoodCand2 = bkgPdfCand2->getVal(&normSet);
+
+        // Calculate signal probability using likelihood ratio
+        double signalProbCand2 = signalLikelihoodCand2 / (signalLikelihoodCand2 + backgroundLikelihoodCand2);
+        //cout << signalLikelihoodCand2 << " bkg likelihood: " << backgroundLikelihoodCand2 << endl;
+
+        // Classify based on probability (e.g., using a threshold)
+        if (signalProbCand2 > 0.5) { // Adjust threshold as needed
+            signalFlagCand2.setLabel("Signal");
+        } else {
+            signalFlagCand2.setLabel("Background");
+        }
+    } else {
+        signalFlagCand2.setLabel("Background");
+    }
+
+      // Add the event with the flag to the new dataset
+      varsWithFlag.setRealValue(massCand1->GetName(), massValCand1);
+      varsWithFlag.setRealValue(massCand2->GetName(), massValCand2);
+      datasetWithFlag.add(varsWithFlag);
+  } 
+  // Create datasets for signal and background regions based on the flag
+  RooDataSet* signalData = (RooDataSet*)datasetWithFlag.reduce(Cut("signalFlagCand1 == signalFlagCand1::Signal"));*/

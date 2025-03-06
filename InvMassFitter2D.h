@@ -35,7 +35,6 @@ class InvMassFitter2D {
         void fillWorkspace(RooDataSet *dataset);
         // Functions to set parameters manually
         void set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency);
-        void setLumi(double const& lumi);
         void removeAmbiguous(bool remove=false);
         void setPtLims(double const& ptMin, double const& ptMax);
         void setPtPairLims(double const& ptMinPair, double const& ptMaxPair);

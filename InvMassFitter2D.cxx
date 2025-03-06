@@ -143,11 +143,6 @@ void InvMassFitter2D::setPtPairLims(double const &ptMinPair, double const &ptMax
   _ptMaxPair = ptMaxPair;
 }
 
-void InvMassFitter2D::setLumi(double const &lumi)
-{
-  _lumi = lumi;
-}
-
 void InvMassFitter2D::setMassLims(double const &massMin, double const &massMax)
 {
   _massMin = massMin;
@@ -886,6 +881,43 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   cout << " ---------------------------------------------- \n\n\n"
        << endl;
 
+  // Save these results in a histogram
+  TH1D *hYields = new TH1D("hYields", "Raw Yields", 4, 0, 4); // 4 bins for SgnSgn, SgnBkg, BkgSgn, BkgBkg
+  hYields->GetXaxis()->SetBinLabel(1, "SgnSgn");
+  hYields->GetXaxis()->SetBinLabel(2, "SgnBkg");
+  hYields->GetXaxis()->SetBinLabel(3, "BkgSgn");
+  hYields->GetXaxis()->SetBinLabel(4, "BkgBkg");
+
+  hYields->SetBinContent(1, yieldSgnSgn->getVal());
+  hYields->SetBinError(1, yieldSgnSgn->getError());
+  hYields->SetBinContent(2, yieldSgnBkg->getVal());
+  hYields->SetBinError(2, yieldSgnBkg->getError());
+  hYields->SetBinContent(3, yieldBkgSgn->getVal());
+  hYields->SetBinError(3, yieldBkgSgn->getError());
+  hYields->SetBinContent(4, yieldBkgBkg->getVal());
+  hYields->SetBinError(4, yieldBkgBkg->getError());
+
+  if (doReflections)
+  {
+    hYields->SetBins(9, 0, 9);
+    hYields->GetXaxis()->SetBinLabel(5, "SgnRefl");
+    hYields->GetXaxis()->SetBinLabel(6, "ReflSgn");
+    hYields->GetXaxis()->SetBinLabel(7, "BkgRefl");
+    hYields->GetXaxis()->SetBinLabel(8, "ReflBkg");
+    hYields->GetXaxis()->SetBinLabel(9, "ReflRefl");
+
+    hYields->SetBinContent(5, yieldSgnRefl->getVal());
+    hYields->SetBinError(5, yieldSgnRefl->getError());
+    hYields->SetBinContent(6, yieldReflSgn->getVal());
+    hYields->SetBinError(6, yieldReflSgn->getError());
+    hYields->SetBinContent(7, yieldBkgRefl->getVal());
+    hYields->SetBinError(7, yieldBkgRefl->getError());
+    hYields->SetBinContent(8, yieldReflBkg->getVal());
+    hYields->SetBinError(8, yieldReflBkg->getError());
+    hYields->SetBinContent(9, yieldReflRefl->getVal());
+    hYields->SetBinError(9, yieldReflRefl->getError());
+  }
+
   // ------------------------------------------------------
   // -- Get efficiency corrected yields per contribution --
   // ------------------------------------------------------
@@ -963,6 +995,47 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   cout << " ---------------------------------------------- \n\n\n"
        << endl;
 
+  // Save the results in a histogram
+  TH1D *hYieldsCorr = new TH1D("hYieldsCorr", "Raw Yields Corrected by efficiencies", 4, 0, 4); // 4 bins for SgnSgn, SgnBkg, BkgSgn, BkgBkg
+  hYieldsCorr->GetXaxis()->SetBinLabel(1, "SgnSgn");
+  hYieldsCorr->GetXaxis()->SetBinLabel(2, "SgnBkg");
+  hYieldsCorr->GetXaxis()->SetBinLabel(3, "BkgSgn");
+  hYieldsCorr->GetXaxis()->SetBinLabel(4, "BkgBkg");
+
+  hYieldsCorr->SetBinContent(1, yieldSgnSgnCorr->getVal());
+  hYieldsCorr->SetBinError(1, yieldSgnSgnCorr->getError());
+  hYieldsCorr->SetBinContent(2, yieldSgnBkgCorr->getVal());
+  hYieldsCorr->SetBinError(2, yieldSgnBkgCorr->getError());
+  hYieldsCorr->SetBinContent(3, yieldBkgSgnCorr->getVal());
+  hYieldsCorr->SetBinError(3, yieldBkgSgnCorr->getError());
+  hYieldsCorr->SetBinContent(4, yieldBkgBkgCorr->getVal());
+  hYieldsCorr->SetBinError(4, yieldBkgBkgCorr->getError());
+
+  if (doReflections)
+  {
+    hYieldsCorr->SetBins(9, 0, 9);
+    hYieldsCorr->GetXaxis()->SetBinLabel(5, "SgnRefl");
+    hYieldsCorr->GetXaxis()->SetBinLabel(6, "ReflSgn");
+    hYieldsCorr->GetXaxis()->SetBinLabel(7, "BkgRefl");
+    hYieldsCorr->GetXaxis()->SetBinLabel(8, "ReflBkg");
+    hYieldsCorr->GetXaxis()->SetBinLabel(9, "ReflRefl");
+
+    hYieldsCorr->SetBinContent(5, yieldSgnReflCorr->getVal());
+    hYieldsCorr->SetBinError(5, yieldSgnReflCorr->getError());
+    hYieldsCorr->SetBinContent(6, yieldReflSgnCorr->getVal());
+    hYieldsCorr->SetBinError(6, yieldReflSgnCorr->getError());
+    hYieldsCorr->SetBinContent(7, yieldBkgReflCorr->getVal());
+    hYieldsCorr->SetBinError(7, yieldBkgReflCorr->getError());
+    hYieldsCorr->SetBinContent(8, yieldReflBkgCorr->getVal());
+    hYieldsCorr->SetBinError(8, yieldReflBkgCorr->getError());
+    hYieldsCorr->SetBinContent(9, yieldReflReflCorr->getVal());
+    hYieldsCorr->SetBinError(9, yieldReflReflCorr->getError());
+  }
+
+  fout->cd();
+  hYields->Write();
+  hYieldsCorr->Write();
+
   // Check by dividing each component by the integrated eff^2
   cout << " ---------------------------------------------- " << endl;
   cout << " ---------------------------------------------- \n"
@@ -1022,12 +1095,6 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   std::cout << "ErrorCorr at (" << xVal << ", " << yVal << "): " << errorCorr << std::endl;
   std::cout << "Relative Error Corr: " << relativeErrorCorr << std::endl;
   cout << "\n\n\n";
-
-  float const BR = 0.03950;
-  float const BRErr = 0.0003;
-
-  float xSec = yieldSgnSgnCorr->getVal() / (BR * BR * _lumi);
-  cout << "CROSS SECTION:  " << xSec << endl;
 
   // Fill histogram with fit results
   double binWidth = 0.005; // Desired bin width
@@ -1747,7 +1814,7 @@ void InvMassFitter2D::analyseKinematicDistributions(TFile *fout, RooDataSet *dat
   /// ------------------ DELTA Y, PT DISTRIBUTIONS --------------------
   /// --------------------------------------------------------------
 
-  gROOT->SetBatch(kTRUE);
+  //gROOT->SetBatch(kTRUE);
 
   // Create histos with pt distributions
   TH1F* histSidebandDeltaPt = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandDeltaPt_%s", suffix), deltaPt, Binning(40, -_ptMax, _ptMax));
@@ -1947,7 +2014,7 @@ void InvMassFitter2D::setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal
 
 void InvMassFitter2D::plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* histSignalCand1, TH1F* histSidebandCand2, TH1F* histSignalCand2,
                                                 float const nSideband, float const nSignal, TString const varName, TString canvasName, TFile *fout) {
-  gROOT->SetBatch(kTRUE);
+  //gROOT->SetBatch(kTRUE);
 
   // Normalise
   histSidebandCand1->Scale(1.0 / nSideband);
@@ -1988,7 +2055,7 @@ void InvMassFitter2D::plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* 
 void InvMassFitter2D::plotDeltaKinematicDistributions(TH1F* histSidebandDeltaPt, TH1F* histSignalDeltaPt, TH1F* histSidebandDeltaY,
                                                       TH1F* histSignalDeltaY, TH1F* histSignalDeltaPhi, TH1F* histSidebandDeltaPhi,
                                                       float const nSideband, float const nSignal, TString canvasName, TFile *fout) {
-  gROOT->SetBatch(kTRUE);
+  //gROOT->SetBatch(kTRUE);
 
   // Normalise
   histSidebandDeltaPt->Scale(1.0 / nSideband);

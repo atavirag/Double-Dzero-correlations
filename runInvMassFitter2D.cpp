@@ -23,12 +23,12 @@ using std::endl;
 
 void runInvMassFitter2D() {
     //const char *fname =  "~/MyMacros/Correlations_v2/triggered_data/AO2D_Data_Full2024.root";
-    const char *fname =  "~/MyMacros/corelations_with_phi/AO2D.root";
+    const char *fname =  "~/MyMacros/corelations_with_phi/AO2D_fullData_newBDTs.root";
     //const char *fname =  "~/MyMacros/Correlations_github/AO2D_MC_noAmbiguous.root";
 
     TFile *file = TFile::Open(fname, "read");
-    TFile *foutLS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_LS_withPhi.root", "RECREATE");
-    TFile *foutOS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_OS_withPhi.root", "RECREATE");
+    TFile *foutLS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_LS_newBDTs.root", "RECREATE");
+    TFile *foutOS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_OS_newBDTs.root", "RECREATE");
     TFile *fEfficiencies = TFile::Open("~/MyMacros/Correlations_github/Eff_times_Acc_Map_weighted.root", "read");
 
     if (!file) {
@@ -38,12 +38,6 @@ void runInvMassFitter2D() {
 
     //TFile *fAnaRes = TFile::Open("~/MyMacros/Correlations_github/AnalysisResults_LHC23_pass4.root");
     TFile *fAnaRes = TFile::Open("~/MyMacros/Correlations_v2/triggered_data/AnalysisResults_Data_Full2024.root");
-
-    TString dirnameBcCount = "bc-selection-task";
-    TDirectory *dirBcData = (TDirectory *)fAnaRes->Get(dirnameBcCount);
-    TH1F *hCounterTVX = (TH1F *)dirBcData->Get("hCounterTVX");
-    cout << "Number of TVX entries: " << hCounterTVX->GetEntries() << endl;
-    float const LumiTVX = hCounterTVX->GetEntries()/(59.4*1000);    //  micro b^-1
 
     TKey *key = (TKey*)file->GetListOfKeys()->At(0);
     TDirectoryFile *dir = (TDirectoryFile*)file->Get(key->GetName());
@@ -130,9 +124,6 @@ void runInvMassFitter2D() {
     fitterLS.setPtPairLims(-100., 100.);
     fitterOS.setPtPairLims(-100.0, 100.);
 
-    fitterLS.setLumi(LumiTVX);
-    fitterOS.setLumi(LumiTVX);
-
     //fitterLS.setMassLims(1.8, 1.95);
     //fitterOS.setMassLims(1.8, 1.95);
     fitterLS.setMassLims(1.73, 2.05);
@@ -157,8 +148,8 @@ void runInvMassFitter2D() {
     fitterOS.setEfficiencyMap(hEffMap);
 
     // do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TFile *fout);
-    fitterLS.do2DFit(true, false, false, foutLS);
     fitterOS.do2DFit(true, false, false, foutOS);
+    fitterLS.do2DFit(true, false, false, foutLS);
 
     cout << "Programa terminado" << endl;
 

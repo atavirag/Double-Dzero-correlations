@@ -124,4 +124,14 @@ void computeLumiTriggered() {
     // Corrected integrated lumi: (Nevents / xSecTVX) * (countsTVX / countsTVXadterBCcuts)
     double corrLumi = lumi * (countsTVX / countsTVXafterBCcuts); // pb⁻1
     std::cout << "  Integrated Luminosity: " << corrLumi << std::endl;
+
+    // Create a histogram for the corrected integrated luminosity
+    TH1F *hCorrLumi = new TH1F("hCorrLumi", "Corrected Integrated Luminosity;Luminosity (pb^{-1});Counts", 1, 0, 1);
+    hCorrLumi->SetBinContent(1, corrLumi);
+    hCorrLumi->SetBinError(1, 0); // Set error to zero unless you want to propagate uncertainties
+
+    // Save to the same ROOT file
+    TFile *outFile = new TFile("Integrated_Lumi.root", "UPDATE"); // "UPDATE" to add to existing file
+    hCorrLumi->Write();
+    outFile->Close();
 }

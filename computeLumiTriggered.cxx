@@ -122,7 +122,7 @@ void computeLumiTriggered() {
     double countsTVXafterBCcuts = hCounterTVXafterBCcuts->GetEntries();
 
     // Corrected integrated lumi: (Nevents / xSecTVX) * (countsTVX / countsTVXadterBCcuts)
-    double corrLumi = lumi * (countsTVX / countsTVXafterBCcuts); // pb⁻1
+    double corrLumi = lumi * (countsTVXafterBCcuts / countsTVX); // pb⁻1
     std::cout << "  Integrated Luminosity: " << corrLumi << std::endl;
 
     // Create a histogram for the corrected integrated luminosity

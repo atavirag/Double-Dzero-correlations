@@ -14,6 +14,10 @@
 #include "TPaveText.h"
 #include "TH1.h"
 #include "TH2.h"
+#include "TH2D.h"
+#include "RooBernstein.h"
+#include "TKey.h"
+
 
 #include "InvMassFitter2D.h"
 
@@ -23,13 +27,13 @@ using std::endl;
 
 void runInvMassFitter2D() {
     //const char *fname =  "~/MyMacros/Correlations_v2/triggered_data/AO2D_Data_Full2024.root";
-    const char *fname =  "~/MyMacros/corelations_with_phi/AO2D_fullData_newBDTs.root";
-    //const char *fname =  "~/MyMacros/Correlations_github/AO2D_MC_noAmbiguous.root";
+    const char *fname =  "~/MyMacros/corelations_with_phi/AO2D_fullData_oldBDTs.root";
+    //const char *fname =  "~/MyMacros/Double-Dzero-correlations/Datasets/AO2D_LHC24k3_full.root";
 
     TFile *file = TFile::Open(fname, "read");
-    TFile *foutLS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_LS_newBDTs.root", "RECREATE");
-    TFile *foutOS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_OS_newBDTs.root", "RECREATE");
-    TFile *fEfficiencies = TFile::Open("~/MyMacros/Correlations_github/Eff_times_Acc_Map_weighted.root", "read");
+    TFile *foutLS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_LS_oldBDTs_main.root", "RECREATE");
+    TFile *foutOS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_OS_oldBDTs_main.root", "RECREATE");
+    TFile *fEfficiencies = TFile::Open("~/MyMacros/Double-Dzero-correlations/Datasets/Eff_times_Acc_Map_weighted_no_ambiguous.root", "read");
 
     if (!file) {
         cout << ">> ERROR File not well readout" << endl;
@@ -115,8 +119,8 @@ void runInvMassFitter2D() {
         return;
     }
 
-    fitterLS.removeAmbiguous(false);
-    fitterOS.removeAmbiguous(false);
+    fitterLS.removeAmbiguous(true);
+    fitterOS.removeAmbiguous(true);
 
     fitterLS.setPtLims(1., 24.);
     fitterOS.setPtLims(1., 24.);
@@ -126,16 +130,16 @@ void runInvMassFitter2D() {
 
     //fitterLS.setMassLims(1.8, 1.95);
     //fitterOS.setMassLims(1.8, 1.95);
-    fitterLS.setMassLims(1.73, 2.05);
-    fitterOS.setMassLims(1.73, 2.05);
+    fitterLS.setMassLims(1.74, 2.04);
+    fitterOS.setMassLims(1.74, 2.04);
 
     // Set signal function for fit: gaus, CB
     // Both work fine for data, but for MC CB works significantly better
     fitterLS.setSgnFunc("gaus");
     fitterOS.setSgnFunc("gaus");
-    // Set background function for fit: expo, poly1, poly2, poly3
-    fitterLS.setBkgFunc("poly3");
-    fitterOS.setBkgFunc("poly3");
+    // Set background function for fit: expo, poly0, poly1, poly2, cheby,expPoly1, expPoly2, expPoly1, bern, exp2
+    fitterLS.setBkgFunc("expPoly2");
+    fitterOS.setBkgFunc("expPoly2");
     // Set reflection function for fit: gaus, doubleGaus
     fitterLS.setReflFunc("gaus");
     fitterOS.setReflFunc("gaus");

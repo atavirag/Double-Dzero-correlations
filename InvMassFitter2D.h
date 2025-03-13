@@ -18,6 +18,8 @@
 #include "RooProdPdf.h"
 #include "RooGenericPdf.h"
 #include "TCanvas.h"
+#include "TH2D.h"
+#include "RooBernstein.h"
 #include "TFile.h"
 
 class InvMassFitter2D {
@@ -35,7 +37,7 @@ class InvMassFitter2D {
         void fillWorkspace(RooDataSet *dataset);
         // Functions to set parameters manually
         void set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency);
-        void removeAmbiguous(bool remove=false);
+        void removeAmbiguous(bool remove);
         void setPtLims(double const& ptMin, double const& ptMax);
         void setPtPairLims(double const& ptMinPair, double const& ptMaxPair);
         void setMassLims(double const& massMin, double const& massMax);

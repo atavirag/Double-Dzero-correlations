@@ -49,17 +49,19 @@ class InvMassFitter2D {
         double calculateWeights(double const& y, double const& pt);
         void analyseKinematicDistributions(TFile *fout, RooDataSet *dataset, const char *suffix);
         void selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgnPdfCand2,RooAbsPdf* &bkgPdfCand1,
-                                RooAbsPdf* &bkgPdfCand2, RooAbsPdf* &reflPdfCand1, RooAbsPdf* &reflPdfCand2);
-        void fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooRealVar& massVar, RooDataSet* dataset,
+                                RooAbsPdf* &bkgPdfCand2, RooAbsPdf* &reflPdfCand1, RooAbsPdf* &reflPdfCand2, int8_t fitType);
+        RooFitResult *fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooRealVar& massVar, RooDataSet* dataset,
                                    const std::string& candidateName, const std::string& plotFilename);
         //double calculateIntegratedEfficiency();
+        void setPrefitParameters(const RooArgList& prefitParams);
+        void setCorrectedParameters(const RooArgList& corrfitParams);
         ROOT::Math::PxPyPzMVector createLorentzVector(double const& phi, double const& y, double const& pt, double const& m);
         RooRealVar *getYieldInRange(RooFitResult *fitResult, RooRealVar *massCand1, RooRealVar *massCand2, RooProdPdf function, RooFormulaVar nCands, TString range);
         // Fitting and plotting functions
         void do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TFile *fout);
-        void plotProjectionsAfterFit(RooProdPdf *model, RooDataSet *dataset, TString saveName, TFile *fout, bool doReflections);
+        void plotProjectionsAfterFit(RooFitResult *fitResult, RooProdPdf *model, RooDataSet *dataset, TString saveName, TFile *fout, bool doReflections, const char* suffix);
         void plot2DFit(TH2D *hMassCorrelations, TH2D* histFit, RooProdPdf *model, Bool_t draw, TFile *fout, TString const& cName);
-        void plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult, const char* title, const char* canvasName);
+        void plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult, const char* sgnComponent, const char* bkgComponent, const char* title, const char* canvasName);
         void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, int const& candNum, TString physVar);
         void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, TString physVar);
         void plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* histSignalCand1, TH1F* histSidebandCand2, TH1F* histSignalCand2,

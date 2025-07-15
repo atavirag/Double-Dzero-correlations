@@ -1,50 +1,59 @@
-#include "RooRealVar.h"
-#include "RooDataSet.h"
-#include "RooGaussian.h"
-#include "RooExponential.h"
-#include "RooChebychev.h"
-#include "RooAddPdf.h"
-#include "RooCurve.h"
-#include "RooWorkspace.h"
-#include "RooPlot.h"
-#include "TCanvas.h"
-#include "TAxis.h"
-#include "TLatex.h"
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <utility>
+
 #include "TFile.h"
-#include "TPaveText.h"
-#include "TH1.h"
-#include "TH2.h"
-#include "TH2D.h"
-#include "RooBernstein.h"
+#include "TTree.h"
 #include "TKey.h"
+#include "TDirectoryFile.h"
+#include "TCanvas.h"
+#include "TH1F.h"
+#include "TH2D.h"
+#include "TString.h"
+#include "TSystem.h"
 
-
+#include "nlohmann/json.hpp"
 #include "InvMassFitter2D.h"
 
 using namespace RooFit;
+using json = nlohmann::json;
 using std::cout;
 using std::endl;
 
+bool verbose;
 void runInvMassFitter2D() {
-    //const char *fname =  "~/MyMacros/Correlations_v2/triggered_data/AO2D_Data_Full2024.root";
-    const char *fname =  "~/MyMacros/corelations_with_phi/AO2D_fullData_oldBDTs.root";
-    //const char *fname =  "~/MyMacros/Double-Dzero-correlations/Datasets/AO2D_LHC24k3_full.root";
 
-    TFile *file = TFile::Open(fname, "read");
-    TFile *foutLS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_LS_oldBDTs_main.root", "RECREATE");
-    TFile *foutOS = TFile::Open("~/MyMacros/corelations_with_phi/correlations_OS_oldBDTs_main.root", "RECREATE");
-    TFile *fEfficiencies = TFile::Open("~/MyMacros/Double-Dzero-correlations/Datasets/Eff_times_Acc_Map_weighted_no_ambiguous.root", "read");
-
-    if (!file) {
-        cout << ">> ERROR File not well readout" << endl;
+    // Load JSON config
+    ifstream jsonFile("config_invMassFitter2D.json");
+    if (!jsonFile.is_open())
+    {
+        cerr << "Error: Could not open JSON file." << endl;
         return;
     }
 
-    //TFile *fAnaRes = TFile::Open("~/MyMacros/Correlations_github/AnalysisResults_LHC23_pass4.root");
-    TFile *fAnaRes = TFile::Open("~/MyMacros/Correlations_v2/triggered_data/AnalysisResults_Data_Full2024.root");
+    // Read the JSON file into a string.
+    std::string jsonString;
+    jsonFile.seekg(0, std::ios::end);
+    jsonString.reserve(jsonFile.tellg());
+    jsonFile.seekg(0, std::ios::beg);
+    jsonString.assign((std::istreambuf_iterator<char>(jsonFile)), std::istreambuf_iterator<char>());
 
-    TKey *key = (TKey*)file->GetListOfKeys()->At(0);
-    TDirectoryFile *dir = (TDirectoryFile*)file->Get(key->GetName());
+    // Parse the JSON data.
+    json jsonData = json::parse(jsonString);
+    verbose = jsonData["verbose"];
+
+    // Use .get<std::string>() before assigning to TString
+    TString const AO2D_data_name  = TString(jsonData["files"]["AO2D_data"].get<std::string>());
+
+    TFile *AO2D_data = TFile::Open(AO2D_data_name, "read");
+    if (!AO2D_data) {
+        cout << ">> ERROR: AO2D_data not well readout" << endl;
+        return;
+    }
+    TKey *key = (TKey*)AO2D_data->GetListOfKeys()->At(0);
+    TDirectoryFile *dir = (TDirectoryFile*)AO2D_data->Get(key->GetName());
 
     TTree *tree = (TTree *)dir->Get("O2d0pair");
     if (!tree) {
@@ -52,108 +61,175 @@ void runInvMassFitter2D() {
         return;
     }
 
-    // load 1D fit results
-    TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_github/rawYields_LHC23_pass4.root", "read");
-    //TFile *file1DFit = TFile::Open("/home/andrea/MyMacros/Correlations_v2/rawYields_LHC24_full_pt23.root", "read");
-    TH1F *hReflOverSgn = (TH1F *)file1DFit->Get("hReflectionOverSignal");
-    //double reflOverSgn = hReflOverSgn->GetBinContent(1);
-    double reflOverSgn = 0.0;
-    cout << "Reflection over signal: " << reflOverSgn << endl;
+    TString const efficiencyMap_name  = TString(jsonData["files"]["efficiency_map"].get<std::string>());
+    TFile *fEfficiencies = TFile::Open(efficiencyMap_name, "read");
+    if (!fEfficiencies) {
+        cout << ">> ERROR: efficiency map file not well readout" << endl;
+        return;
+    }
 
-    TFile *fileEffInt = TFile::Open("/home/andrea/MyMacros/Common/AccEffPreselD0ToKPi_k3_SecondBDT_ptIntegrated.root", "read");
-    TH1F *hEffInt = (TH1F *)fileEffInt->Get("hAccEffPreselD0ToKPi_k3_SecondBDT_ptIntegratedAll");
+    TString const anaRes_data_name  = TString(jsonData["files"]["AnalysisResults_data"].get<std::string>());
+    TFile *fAnaRes = TFile::Open(anaRes_data_name, "read");
+    if (!fAnaRes) {
+        cout << ">> ERROR: analysis results data not well readout" << endl;
+        return;
+    }
+
+    TString const singleD0_fitResults_name  = TString(jsonData["files"]["singleD0_fitResults"].get<std::string>());
+    TFile *file1DFit = TFile::Open(singleD0_fitResults_name, "read");
+    if (!file1DFit) {
+        cout << ">> ERROR: single D fit not well readout" << endl;
+        return;
+    }
+
+    TString const intEff_name  = TString(jsonData["files"]["integrated_efficiency"].get<std::string>());
+    TFile *fileEffInt = TFile::Open(intEff_name, "read");
+    if (!fileEffInt) {
+        cout << ">> ERROR: integrated efficiency file not well readout" << endl;
+        return;
+    }
+
+    if (verbose) {
+        cout << "Loaded files." << endl;
+    }
+
+    std::vector<std::pair<double, double>> ptSingleRanges;
+    std::vector<std::pair<double, double>> ptPairRange;
+    std::vector<std::pair<double, double>> massRanges;
+
+    auto loadRanges = [](const nlohmann::json& j, const std::string& key) {
+        std::vector<std::pair<double, double>> ranges;
+        for (const auto& range : j["ranges"][key]) {
+            if (range.is_array() && range.size() == 2) {
+                ranges.emplace_back(range[0].get<double>(), range[1].get<double>());
+            }
+        }
+        return ranges;
+    };
+
+    ptSingleRanges = loadRanges(jsonData, "ptSingle");
+    ptPairRange = loadRanges(jsonData, "ptPair");
+    massRanges = loadRanges(jsonData, "mass");
+
+    std::string ptPairLimStrFirst = Form("%.2f", ptPairRange[0].first);
+    std::string ptPairLimStrSecond = Form("%.2f", ptPairRange[0].second);
+
+    std::string bkgFunc = jsonData["functions"]["bkgFunc"].get<std::string>();
+    std::string sgnFunc = jsonData["functions"]["sgnFunc"].get<std::string>();
+    std::string reflFunc = jsonData["functions"]["reflFunc"].get<std::string>();
+
+    if (verbose) {
+        cout << "  Selected functions:" << endl;
+        cout << "   - Background function: " << bkgFunc << endl;
+        cout << "   - Signal function: " << sgnFunc << endl;
+        cout << "   - Reflected function: " << reflFunc << endl;
+        cout << endl;
+    }
+
+        TH1F *hReflOverSgn = (TH1F *)file1DFit->Get("hReflectionOverSignal");
+    double reflOverSgn = hReflOverSgn->GetBinContent(1);
+    //double reflOverSgn = 0.0;
+    if (verbose) {
+        cout << "Reflection over signal: " << reflOverSgn << endl;
+    }
+
+    TH1F *hEffInt = (TH1F *)fileEffInt->Get("hAccEffPreselD0ToKPi_bothBDTs_no_ambiguous_pt_integratedAll");
     double integratedEff = hEffInt->GetBinContent(1);
 
-    //TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_github/workspace_massFitter_LHC23_pass4.root", "read");
-    TFile *fileWorkspace = TFile::Open("/home/andrea/MyMacros/Correlations_github/workspace_massFitter_full2024.root", "read");
-    if (!fileWorkspace || fileWorkspace->IsZombie()) {
-        std::cerr << "Error opening workspace file!" << std::endl;
+    //TH2F *hEffMap = dynamic_cast<TH2F *>(fEfficiencies->Get("hEfficiencyMapAll"));
+    TH2D *hEffMap = dynamic_cast<TH2D *>(fEfficiencies->Get("hEfficiencyMap"));
+    if (!hEffMap) {
+        std::cerr << "Error: Histogram 'efficiency map' not found or not a TH2F." << std::endl;
         return;
     }
-    RooWorkspace* w = (RooWorkspace*)fileWorkspace->Get("wOut");
-    if (!w) {
-        std::cerr << "Workspace not found in file!" << std::endl;
-        fileWorkspace->Close();
-        return;
-    }
-    RooDataSet* dataSaved = (RooDataSet*)w->data("dataToSave");
 
-    // Get all variables in the workspace
-    const RooArgSet* varsSaved = dataSaved->get();
+    std::vector<bool> removeAmbiguous = jsonData["options"]["removeAmbiguous"];
+    std::vector<bool> fitReflections = jsonData["options"]["fitReflections"];
+    bool doFit = jsonData["options"]["doFit"];
+    bool analyseKinematics = jsonData["options"]["analyseKinematics"];
+    bool isMc = jsonData["options"]["isMC"];
 
-    if (dataSaved && varsSaved)
-    {
-        // Loop over all variables in the dataset
-        RooFIter iter = varsSaved->fwdIterator();
-        RooAbsArg *var = nullptr;
+    for (size_t i = 0; i < ptSingleRanges.size(); ++i) {
+        for (const auto& mass : massRanges) {
+            const auto& ptSingle = ptSingleRanges[i];
 
-        while ((var = iter.next()))
-        {
-            // Cast to RooRealVar to access value, if applicable
-            RooRealVar *realVar = dynamic_cast<RooRealVar *>(var);
-            if (realVar)
-            {
-                std::cout << "Variable: " << realVar->GetName()
-                          << ", Value: " << realVar->getVal() << std::endl;
+            std::string ptSingleLimStrFirst = Form("%.f", ptSingle.first);
+            std::string ptSingleLimStrSecond = Form("%.f", ptSingle.second);
+
+            std::string massLimStrFirst = Form("%.2f", mass.first);
+            std::string massLimStrSecond = Form("%.2f", mass.second);
+
+            if (verbose) {
+                std::cout << "Running fit for:" << std::endl;
+                std::cout << "  ptSingle: [" << ptSingle.first << ", " << ptSingle.second << "]" << std::endl;
+                std::cout << "  ptPair:   [" << ptPairRange[0].first << ", " << ptPairRange[0].second << "]" << std::endl;
+                std::cout << "  mass:     [" << mass.first << ", " << mass.second << "]" << std::endl;
             }
-            else
-            {
-                std::cout << "Variable: " << var->GetName()
-                          << " is not a RooRealVar." << std::endl;
+
+            std::string filenameLS = "correlations_LS_" + bkgFunc + "_" +
+                                    massLimStrFirst + "_" + massLimStrSecond + "_pt_" + ptSingleLimStrFirst + "_" + ptSingleLimStrSecond + ".root";
+            std::string filenameOS = "correlations_OS_" + bkgFunc + "_" +
+                                    massLimStrFirst + "_" + massLimStrSecond + "_pt_" + ptSingleLimStrFirst + "_" + ptSingleLimStrSecond + ".root";
+
+            TFile *foutLS = TFile::Open(filenameLS.c_str(), "RECREATE");
+            TFile *foutOS = TFile::Open(filenameOS.c_str(), "RECREATE");
+
+            if (verbose) {
+                cout << " !! Saving LS results in " << filenameLS << endl;
+                cout << " !! Saving OS results in " << filenameOS << endl;
+            }
+
+            InvMassFitter2D fitterLS(tree, "LS");
+            InvMassFitter2D fitterOS(tree, "OS");
+            cout << "fitter objects created and tree data loaded" << endl;
+
+    
+            fitterLS.removeAmbiguous(removeAmbiguous[i]);
+            fitterOS.removeAmbiguous(removeAmbiguous[i]);
+
+            fitterLS.setPtLims(ptSingle.first, ptSingle.second);
+            fitterOS.setPtLims(ptSingle.first, ptSingle.second);
+
+            fitterLS.setPtPairLims(ptPairRange[0].first, ptPairRange[0].second);
+            fitterOS.setPtPairLims(ptPairRange[0].first, ptPairRange[0].second);
+
+            fitterLS.setMassLims(mass.first, mass.second);
+            fitterOS.setMassLims(mass.first, mass.second);
+
+            // Set signal function for fit: gaus, CB
+            // Both work fine for data, but for MC CB works significantly better
+            fitterLS.setSgnFunc(sgnFunc);
+            fitterOS.setSgnFunc(sgnFunc);
+            // Set background function for fit: expo, poly0, poly1, poly2, expPoly1, expPoly2, expPoly1, exp2
+            fitterLS.setBkgFunc(bkgFunc);
+            fitterOS.setBkgFunc(bkgFunc);
+            // Set reflection function for fit: gaus, doubleGaus
+            fitterLS.setReflFunc(reflFunc);
+            fitterOS.setReflFunc(reflFunc);
+
+
+            fitterLS.set1DParameters(reflOverSgn, integratedEff);
+            fitterOS.set1DParameters(reflOverSgn, integratedEff);
+
+            fitterLS.setEfficiencyMap(hEffMap);
+            fitterOS.setEfficiencyMap(hEffMap);
+
+            // do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TFile *fout);
+
+            if (doFit) {
+                fitterLS.do2DFit(true, fitReflections[i], isMc, foutLS);
+                fitterOS.do2DFit(true, fitReflections[i], isMc, foutOS);
+            }
+
+            if (analyseKinematics) {
+                fitterLS.analyseKinematicDistributions(foutLS, false, "beforeEffs_LS");
+                fitterLS.analyseKinematicDistributions(foutLS, true, "afterEffs_LS");
+
+                fitterOS.analyseKinematicDistributions(foutOS, false, "beforeEffs_OS");
+                fitterOS.analyseKinematicDistributions(foutOS, true, "afterEffs_OS");
             }
         }
     }
-    else
-    {
-        std::cerr << "Data or variables set is null!" << std::endl;
-    }
-
-    InvMassFitter2D fitterLS(tree, "LS");
-    InvMassFitter2D fitterOS(tree, "OS");
-    cout << "fitter objects created and tree data loaded" << endl;
-
-    //TH2F *hEffMap = dynamic_cast<TH2F *>(fEfficiencies->Get("hEfficiencyMapAll"));
-    TH2F *hEffMap = dynamic_cast<TH2F *>(fEfficiencies->Get("reducedEfficiencyMap"));
-    if (!hEffMap) {
-        std::cerr << "Error: Histogram 'reducedEfficiencyMap' not found or not a TH2F." << std::endl;
-        return;
-    }
-
-    fitterLS.removeAmbiguous(true);
-    fitterOS.removeAmbiguous(true);
-
-    fitterLS.setPtLims(1., 24.);
-    fitterOS.setPtLims(1., 24.);
-
-    fitterLS.setPtPairLims(-100., 100.);
-    fitterOS.setPtPairLims(-100.0, 100.);
-
-    //fitterLS.setMassLims(1.8, 1.95);
-    //fitterOS.setMassLims(1.8, 1.95);
-    fitterLS.setMassLims(1.74, 2.04);
-    fitterOS.setMassLims(1.74, 2.04);
-
-    // Set signal function for fit: gaus, CB
-    // Both work fine for data, but for MC CB works significantly better
-    fitterLS.setSgnFunc("gaus");
-    fitterOS.setSgnFunc("gaus");
-    // Set background function for fit: expo, poly0, poly1, poly2, cheby,expPoly1, expPoly2, expPoly1, bern, exp2
-    fitterLS.setBkgFunc("expPoly2");
-    fitterOS.setBkgFunc("expPoly2");
-    // Set reflection function for fit: gaus, doubleGaus
-    fitterLS.setReflFunc("gaus");
-    fitterOS.setReflFunc("gaus");
-
-
-    fitterLS.set1DParameters(varsSaved, reflOverSgn, integratedEff);
-    fitterOS.set1DParameters(varsSaved, reflOverSgn, integratedEff);
-
-    fitterLS.setEfficiencyMap(hEffMap);
-    fitterOS.setEfficiencyMap(hEffMap);
-
-    // do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TFile *fout);
-    fitterOS.do2DFit(true, false, false, foutOS);
-    fitterLS.do2DFit(true, false, false, foutLS);
 
     cout << "Programa terminado" << endl;
 

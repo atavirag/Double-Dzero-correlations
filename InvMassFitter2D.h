@@ -36,7 +36,7 @@ class InvMassFitter2D {
         void fillDataset(RooDataSet &data, RooArgSet &vars);
         void fillWorkspace(RooDataSet *dataset);
         // Functions to set parameters manually
-        void set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency);
+        void set1DParameters(double const &reflOverSgn, double const &integratedEfficiency);
         void removeAmbiguous(bool remove);
         void setPtLims(double const& ptMin, double const& ptMax);
         void setPtPairLims(double const& ptMinPair, double const& ptMaxPair);
@@ -44,17 +44,21 @@ class InvMassFitter2D {
         void setSgnFunc(TString const& sgnFunc);
         void setBkgFunc(TString  const& bkgFunc);
         void setReflFunc(TString  const& reflFunc);
-        void setEfficiencyMap(TH2F *h);
+        void setEfficiencyMap(TH2D *h);
         // Functions for checks and calculations
         double calculateWeights(double const& y, double const& pt);
-        void analyseKinematicDistributions(TFile *fout, RooDataSet *dataset, const char *suffix);
+        void analyseKinematicDistributions(TFile *fout, bool isWeighted, const char *suffix);
         void selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgnPdfCand2,RooAbsPdf* &bkgPdfCand1,
                                 RooAbsPdf* &bkgPdfCand2, RooAbsPdf* &reflPdfCand1, RooAbsPdf* &reflPdfCand2, int8_t fitType);
         RooFitResult *fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooRealVar& massVar, RooDataSet* dataset,
                                    const std::string& candidateName, const std::string& plotFilename);
+        RooFitResult *fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooAbsPdf* reflPdf, RooRealVar& massVar, RooDataSet* dataset,
+                                            const std::string& candidateName, const std::string& plotFilename);
+        void plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult,
+                                     const char* sgnComponent, const char* bkgComponent, const char* reflComponent, const char* title, const char* canvasName);
         //double calculateIntegratedEfficiency();
         void setPrefitParameters(const RooArgList& prefitParams);
-        void setCorrectedParameters(const RooArgList& corrfitParams);
+        //void setCorrectedParameters(const RooArgList& corrfitParams);
         ROOT::Math::PxPyPzMVector createLorentzVector(double const& phi, double const& y, double const& pt, double const& m);
         RooRealVar *getYieldInRange(RooFitResult *fitResult, RooRealVar *massCand1, RooRealVar *massCand2, RooProdPdf function, RooFormulaVar nCands, TString range);
         // Fitting and plotting functions
@@ -62,13 +66,15 @@ class InvMassFitter2D {
         void plotProjectionsAfterFit(RooFitResult *fitResult, RooProdPdf *model, RooDataSet *dataset, TString saveName, TFile *fout, bool doReflections, const char* suffix);
         void plot2DFit(TH2D *hMassCorrelations, TH2D* histFit, RooProdPdf *model, Bool_t draw, TFile *fout, TString const& cName);
         void plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult, const char* sgnComponent, const char* bkgComponent, const char* title, const char* canvasName);
-        void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, int const& candNum, TString physVar);
-        void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, TString physVar);
-        void plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* histSignalCand1, TH1F* histSidebandCand2, TH1F* histSignalCand2,
-                                        float const nSideband, float const nSignal, TString const varName, TString canvasName, TFile* fout);
-        void plotDeltaKinematicDistributions(TH1F* histSidebandDeltaPt, TH1F* histSignalDeltaPt, TH1F* histSidebandDeltaY,
-                                            TH1F* histSignalDeltaY, TH1F* histSignalDeltaPhi, TH1F* histSidebandDeltaPhi,
-                                            float const nSideband, float const nSignal, TString canvasName, TFile *fout);
+        //void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, int const& candNum, TString physVar);
+        //void setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, TString physVar);
+        //void plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* histSignalCand1, TH1F* histSidebandCand2, TH1F* histSignalCand2,
+        //                                float const nSideband, float const nSignal, TString const varName, TString canvasName, TFile* fout);
+        //void plotDeltaKinematicDistributions(TH1F* histSidebandDeltaPt, TH1F* histSignalDeltaPt, TH1F* histSidebandDeltaY,
+        //                                    TH1F* histSignalDeltaY, TH1F* histSignalDeltaPhi, TH1F* histSidebandDeltaPhi,
+        //                                    float const nSideband, float const nSignal, TString canvasName, TFile *fout);
+
+        void addText(bool drawStats);
 
     private:
         // Member variables
@@ -106,7 +112,7 @@ class InvMassFitter2D {
         RooRealVar* _rawYield;
         double _reflOverSgn = 0.;
         double _integratedEfficiency = 0.;
-        TH2F *_efficiencyMap;
+        TH2D *_efficiencyMap;
 
         RooRealVar rooPtCand1;
         RooRealVar rooPtCand2;
@@ -133,6 +139,15 @@ class InvMassFitter2D {
 
         RooAddPdf* _totPdf2D;
         RooAddPdf* _weightedTotPdf2D;
+
+        TCanvas* create2DCanvas(TH2F* hist, const std::string& canvasName, const char* suffix,
+                           const std::string& xTitle, const std::string& yTitle,
+                           bool setLogz, bool setLogy);
+        void configureHistogram(TH1D* hist, int markerStyle, int color);
+        TH1D* createProjectionWithLabels(TH2F* hist2D, const char* name, 
+                                     const char* titleFormat, double ptMin, double ptMax, 
+                                     const char* axisLabel);
+        void saveCanvasIfNeeded(TCanvas* canvas, const std::string& filename, const char* suffix);
 
 };
 

@@ -9,6 +9,7 @@
 #include "TPaveText.h"
 #include "RooFitResult.h"
 #include "TStyle.h"
+#include "TBox.h"
 #include "RooCurve.h"
 #include "TLegend.h"
 #include "RooFormulaVar.h"
@@ -40,7 +41,8 @@ enum CandidateType
 enum fitOrder {
   Prefit = 0,
   Rawfit,
-  Corrfit
+  Corrfit,
+  PrefitCorr
 };
 
 // Constructors
@@ -92,13 +94,13 @@ void InvMassFitter2D::_loadTreeInfo()
     cerr << "ERROR: tree not found!" << endl;
     return;
   }
-  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
-  _tree->SetBranchAddress("fPtCand1", &phiCand1);
-  _tree->SetBranchAddress("fPtCand2", &phiCand2);
+  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!! -- Sólo en el código del Preliminary
+  _tree->SetBranchAddress("fPtCand1", &ptCand1);
+  _tree->SetBranchAddress("fPtCand2", &ptCand2);
   _tree->SetBranchAddress("fYCand1", &yCand1);
   _tree->SetBranchAddress("fYCand2", &yCand2);
-  _tree->SetBranchAddress("fPhiCand1", &ptCand1);
-  _tree->SetBranchAddress("fPhiCand2", &ptCand2);
+  _tree->SetBranchAddress("fPhiCand1", &phiCand1);
+  _tree->SetBranchAddress("fPhiCand2", &phiCand2);
   _tree->SetBranchAddress("fMDCand1", &mDCand1);
   _tree->SetBranchAddress("fMDCand2", &mDCand2);
   _tree->SetBranchAddress("fMDbarCand1", &mDbarCand1);
@@ -158,9 +160,9 @@ void InvMassFitter2D::setMassLims(double const &massMin, double const &massMax)
   _massMax = massMax;
 }
 
-void InvMassFitter2D::setEfficiencyMap(TH2F *h)
+void InvMassFitter2D::setEfficiencyMap(TH2D *h)
 {
-  _efficiencyMap = (TH2F *)h->Clone();
+  _efficiencyMap = (TH2D *)h->Clone();
 }
 
 void InvMassFitter2D::setSgnFunc(TString const &sgnFunc)
@@ -217,8 +219,8 @@ void InvMassFitter2D::createDataset()
 void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
 {
 
-  RooRealVar *weightsCand1;
-  RooRealVar *weightsCand2;
+  RooRealVar *weightsCand1 = nullptr;
+  RooRealVar *weightsCand2 = nullptr;
 
   double totalWeight = 0.; // Variable to store the total weight for normalization
   if (_efficiencyMap && vars.getSize() != 9)
@@ -229,13 +231,13 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
 
   // Fill the dataset with info from the tree
   cout << "Number of tree entries " << _tree->GetEntries() << endl;
-  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
-  _tree->SetBranchAddress("fPtCand1", &phiCand1);
-  _tree->SetBranchAddress("fPtCand2", &phiCand2);
+  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!! -- Sólo en el código del Preliminary
+  _tree->SetBranchAddress("fPtCand1", &ptCand1);
+  _tree->SetBranchAddress("fPtCand2", &ptCand2);
   _tree->SetBranchAddress("fYCand1", &yCand1);
   _tree->SetBranchAddress("fYCand2", &yCand2);
-  _tree->SetBranchAddress("fPhiCand1", &ptCand1);
-  _tree->SetBranchAddress("fPhiCand2", &ptCand2);
+  _tree->SetBranchAddress("fPhiCand1", &phiCand1);
+  _tree->SetBranchAddress("fPhiCand2", &phiCand2);
   _tree->SetBranchAddress("fMDCand1", &mDCand1);
   _tree->SetBranchAddress("fMDCand2", &mDCand2);
   _tree->SetBranchAddress("fMDbarCand1", &mDbarCand1);
@@ -266,6 +268,10 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
 
     // Select pT range using the pT of the pair
     if ((ptCand1 < _ptMin || ptCand2 < _ptMin) || (ptCand1 > _ptMax || ptCand2 > _ptMax)) {
+      continue;
+    }
+
+    if ((yCand1 > 0.5 || yCand1 < -0.5) || (yCand2 > 0.5 || yCand2 < -0.5)) {
       continue;
     }
 
@@ -352,6 +358,8 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
       double weightCand1 = 1., weightCand2 = 1.;
       double combinedWeight = 1.;
 
+      totalWeight += combinedWeight;
+
       if (_efficiencyMap) {
         weightCand1 = calculateWeights(yCand1, ptCand1);
         weightCand2 = calculateWeights(yCand2, ptCand2);
@@ -360,7 +368,6 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
           weightsCand1->setVal(weightCand1);
           weightsCand2->setVal(weightCand2);
         }
-        totalWeight += combinedWeight;
       }
 
       if (strcmp(_pairType, "OS") == 0) {
@@ -392,17 +399,8 @@ void InvMassFitter2D::fillDataset(RooDataSet &data, RooArgSet &vars)
   std::cout << "Counter after removing ambiguous: " << counterAfterAmbiguous << endl;
 }
 
-void InvMassFitter2D::set1DParameters(const RooArgSet *vars1D, double const &reflOverSgn, double const &integratedEfficiency)
+void InvMassFitter2D::set1DParameters(double const &reflOverSgn, double const &integratedEfficiency)
 {
-  _tau = (RooRealVar *)vars1D->find("tau");
-  _mean = (RooRealVar *)vars1D->find("mean");
-  _sigma = (RooRealVar *)vars1D->find("sigma");
-  _meanRefl = (RooRealVar *)vars1D->find("meanRefl");
-  _sigmaRefl = (RooRealVar *)vars1D->find("sigmaRefl");
-  _fracRefl = (RooRealVar *)vars1D->find("fracRefl");
-  _meanReflDoubleGaus = (RooRealVar *)vars1D->find("meanReflDoubleGaus");
-  _sigmaReflDoubleGaus = (RooRealVar *)vars1D->find("sigmaReflDoubleGaus");
-  _rawYield = (RooRealVar *)vars1D->find("rooRawYield");
   _reflOverSgn = reflOverSgn;
   _integratedEfficiency = integratedEfficiency;
 }
@@ -412,11 +410,11 @@ void InvMassFitter2D::set1DParameters(const RooArgSet *vars1D, double const &ref
 void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
 {
   const RooArgSet *vars = dataset->get();
-  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!!
+  ////// PT Y PHI ESTÁN INVERTIDOS EN LOS TREES QUE USARON ML EN EL CORRELATOR EN DATOS!!!!! --- Sólo en el código del Preliminary
   RooRealVar *massCand1 = dynamic_cast<RooRealVar *>(vars->find("fMCand1"));
   RooRealVar *massCand2 = dynamic_cast<RooRealVar *>(vars->find("fMCand2"));
-  RooRealVar *ptCand1 = dynamic_cast<RooRealVar *>(vars->find("fPhiCand1"));
-  RooRealVar *ptCand2 = dynamic_cast<RooRealVar *>(vars->find("fPhiCand2"));
+  RooRealVar *ptCand1 = dynamic_cast<RooRealVar *>(vars->find("fPtCand1"));
+  RooRealVar *ptCand2 = dynamic_cast<RooRealVar *>(vars->find("fPtCand2"));
   RooRealVar *yCand1 = dynamic_cast<RooRealVar *>(vars->find("fYCand1"));
   RooRealVar *yCand2 = dynamic_cast<RooRealVar *>(vars->find("fYCand2"));
 
@@ -437,6 +435,9 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooRealVar tauCand1Corr("tauCand1Corr", "tauCand1Corr", -1., -3., 1.);
   RooRealVar tauCand2Corr("tauCand2Corr", "tauCand2Corr", -1, -3., 1.);
 
+  RooRealVar tauCand1CorrPrefit("tauCand1CorrPrefit", "tauCand1CorrPrefit", -1., -3., 1.);
+  RooRealVar tauCand2CorrPrefit("tauCand2CorrPrefit", "tauCand2CorrPrefit", -1, -3., 1.);
+
   RooAbsPdf *bkgFuncExpoCand1Prefit = new RooExponential("bkgFuncExpoCand1Prefit", "background prefit function of candidate 1", *massCand1, tauCand1Prefit);
   RooAbsPdf *bkgFuncExpoCand2Prefit = new RooExponential("bkgFuncExpoCand2Prefit", "background prefit function of candidate 2", *massCand2, tauCand2Prefit);
 
@@ -446,22 +447,30 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *bkgFuncExpoCand1Corr = new RooExponential("bkgFuncExpoCand1Corr", "Corrected background fit function of candidate 1", *massCand1, tauCand1Corr);
   RooAbsPdf *bkgFuncExpoCand2Corr = new RooExponential("bkgFuncExpoCand2Corr", "Corrected background fit function of candidate 2", *massCand2, tauCand2Corr);
 
+  RooAbsPdf *bkgFuncExpoCand1CorrPrefit = new RooExponential("bkgFuncExpoCand1CorrPrefit", "Prefit Corrected background fit function of candidate 1", *massCand1, tauCand1CorrPrefit);
+  RooAbsPdf *bkgFuncExpoCand2CorrPrefit = new RooExponential("bkgFuncExpoCand2CorrPrefit", "Prefit Corrected background fit function of candidate 2", *massCand2, tauCand2CorrPrefit);
+
   _workspace.import(*bkgFuncExpoCand1Prefit);
   _workspace.import(*bkgFuncExpoCand2Prefit);
   _workspace.import(*bkgFuncExpoCand1);
   _workspace.import(*bkgFuncExpoCand2);
   _workspace.import(*bkgFuncExpoCand1Corr);
   _workspace.import(*bkgFuncExpoCand2Corr);
+  _workspace.import(*bkgFuncExpoCand1CorrPrefit);
+  _workspace.import(*bkgFuncExpoCand2CorrPrefit);
 
   // bkg poly0: c1 (useful for MC)
-  RooRealVar c1Prefit("c1Prefit", "Prefit Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
-  RooRealVar c1Cand2Prefit("c1Cand2Prefit", "Prefit Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
+  RooRealVar c1Prefit("c1Prefit", "Prefit Linear coefficient", 10, -10., 1e10);      // c1: constant coefficient
+  RooRealVar c1Cand2Prefit("c1Cand2Prefit", "Prefit Linear coefficient", 10, -10., 1e10);      // c1: constant coefficient
 
-  RooRealVar c1("c1", "Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
-  RooRealVar c1Cand2("c1Cand2", "Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
+  RooRealVar c1("c1", "Linear coefficient", -1, -10., 1e10);      // c1: constant coefficient
+  RooRealVar c1Cand2("c1Cand2", "Linear coefficient", -1, -10., 1e10);      // c1: constant coefficient
 
   RooRealVar c1Corr("c1Corr", "Corrected Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
   RooRealVar c1Cand2Corr("c1Cand2Corr", "Corrected Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
+
+  RooRealVar c1CorrPrefit("c1CorrPrefit", "Corrected Prefit Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
+  RooRealVar c1Cand2CorrPrefit("c1Cand2CorrPrefit", "Corrected Prefit Linear coefficient", 1, -10., 1e10);      // c1: constant coefficient
 
   RooAbsPdf *bkgFuncPoly0Cand1Prefit = new RooPolynomial("bkgFuncPoly0Cand1Prefit", "background prefit function of candidate 1", *massCand1, RooArgList(c1Prefit));
   RooAbsPdf *bkgFuncPoly0Cand2Prefit = new RooPolynomial("bkgFuncPoly0Cand2Prefit", "background prefit function of candidate 2", *massCand2, RooArgList(c1Cand2Prefit));
@@ -472,22 +481,30 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *bkgFuncPoly0Cand1Corr = new RooPolynomial("bkgFuncPoly0Cand1Corr", "Corrected background fit function of candidate 1", *massCand1, RooArgList(c1Corr));
   RooAbsPdf *bkgFuncPoly0Cand2Corr = new RooPolynomial("bkgFuncPoly0Cand2Corr", "Corrected background fit function of candidate 2", *massCand2, RooArgList(c1Cand2Corr));
 
+  RooAbsPdf *bkgFuncPoly0Cand1CorrPrefit = new RooPolynomial("bkgFuncPoly0Cand1CorrPrefit", "Prefit Corrected background fit function of candidate 1", *massCand1, RooArgList(c1CorrPrefit));
+  RooAbsPdf *bkgFuncPoly0Cand2CorrPrefit = new RooPolynomial("bkgFuncPoly0Cand2CorrPrefit", "Prefit Corrected background fit function of candidate 2", *massCand2, RooArgList(c1Cand2CorrPrefit));
+
   _workspace.import(*bkgFuncPoly0Cand1Prefit);
   _workspace.import(*bkgFuncPoly0Cand2Prefit);
   _workspace.import(*bkgFuncPoly0Cand1);
   _workspace.import(*bkgFuncPoly0Cand2);
   _workspace.import(*bkgFuncPoly0Cand1Corr);
   _workspace.import(*bkgFuncPoly0Cand2Corr);
+  _workspace.import(*bkgFuncPoly0Cand1CorrPrefit);
+  _workspace.import(*bkgFuncPoly0Cand2CorrPrefit);
 
   // bkg poly1: c1 + c2*x
-  RooRealVar c2Prefit("c2Prefit", "Prefit Linear coefficient", -0.15, -3.5, 1.); // c2: linear coefficient
-  RooRealVar c2Cand2Prefit("c2Cand2Prefit", "Prefit Linear coefficient", -0.15, -3.5, 1.); // c2: linear coefficient
+  RooRealVar c2Prefit("c2Prefit", "Prefit Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
+  RooRealVar c2Cand2Prefit("c2Cand2Prefit", "Prefit Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
 
-  RooRealVar c2("c2", "Linear coefficient", -0.15, -3.5, 1.); // c2: linear coefficient
-  RooRealVar c2Cand2("c2Cand2", "Linear coefficient", -0.15, -3.5, 1.); // c2: linear coefficient
+  RooRealVar c2("c2", "Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
+  RooRealVar c2Cand2("c2Cand2", "Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
 
-  RooRealVar c2Corr("c2Corr", "Corrected Linear coefficient", -0.15, -3.5, 1.); // c2: linear coefficient
-  RooRealVar c2Cand2Corr("c2Cand2Corr", "Corrected Linear coefficient", -0.15, -3.5, 1.); // c2: linear coefficient
+  RooRealVar c2Corr("c2Corr", "Corrected Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
+  RooRealVar c2Cand2Corr("c2Cand2Corr", "Corrected Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
+
+  RooRealVar c2CorrPrefit("c2CorrPrefit", "Corrected Prefit Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
+  RooRealVar c2Cand2CorrPrefit("c2Cand2CorrPrefit", "Corrected Prefit Linear coefficient", -3.15, -10, 1.); // c2: linear coefficient
 
   RooAbsPdf *bkgFuncPoly1Cand1Prefit = new RooPolynomial("bkgFuncPoly1Cand1Prefit", "background prefit function of candidate 1", *massCand1, RooArgList(c1Prefit, c2Prefit));
   RooAbsPdf *bkgFuncPoly1Cand2Prefit = new RooPolynomial("bkgFuncPoly1Cand2Prefit", "background prefit function of candidate 2", *massCand2, RooArgList(c1Cand2Prefit, c2Cand2Prefit));
@@ -498,22 +515,30 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *bkgFuncPoly1Cand1Corr = new RooPolynomial("bkgFuncPoly1Cand1Corr", "Corrected background fit function of candidate 1", *massCand1, RooArgList(c1Corr, c2Corr));
   RooAbsPdf *bkgFuncPoly1Cand2Corr = new RooPolynomial("bkgFuncPoly1Cand2Corr", "Corrected background fit function of candidate 2", *massCand2, RooArgList(c1Cand2Corr, c2Cand2Corr));
 
+  RooAbsPdf *bkgFuncPoly1Cand1CorrPrefit = new RooPolynomial("bkgFuncPoly1Cand1CorrPrefit", "Prefit Corrected background fit function of candidate 1", *massCand1, RooArgList(c1CorrPrefit, c2CorrPrefit));
+  RooAbsPdf *bkgFuncPoly1Cand2CorrPrefit = new RooPolynomial("bkgFuncPoly1Cand2CorrPrefit", "Prefit Corrected background fit function of candidate 2", *massCand2, RooArgList(c1Cand2CorrPrefit, c2Cand2CorrPrefit));
+
   _workspace.import(*bkgFuncPoly1Cand1Prefit);
   _workspace.import(*bkgFuncPoly1Cand2Prefit);
   _workspace.import(*bkgFuncPoly1Cand1);
   _workspace.import(*bkgFuncPoly1Cand2);
   _workspace.import(*bkgFuncPoly1Cand1Corr);
   _workspace.import(*bkgFuncPoly1Cand2Corr);
+  _workspace.import(*bkgFuncPoly1Cand1CorrPrefit);
+  _workspace.import(*bkgFuncPoly1Cand2CorrPrefit);
 
   // bkg poly2: c1 + c2*x + c3*x^2
-  RooRealVar c3Prefit("c3Prefit", "Prefit Quadratic coefficient", 0.3, -1., 1.);           // c3: quadratic coefficient
-  RooRealVar c3Cand2Prefit("c3Cand2Prefit", "Prefit Quadratic coefficient", 0.3, -1., 1.); // c3: quadratic coefficient
+  RooRealVar c3Prefit("c3Prefit", "Prefit Quadratic coefficient", 0.3, 0., 1.);           // c3: quadratic coefficient
+  RooRealVar c3Cand2Prefit("c3Cand2Prefit", "Prefit Quadratic coefficient", 0.3, 0., 1.); // c3: quadratic coefficient
 
-  RooRealVar c3("c3", "Quadratic coefficient", 0.3, -1., 1.);           // c3: quadratic coefficient
-  RooRealVar c3Cand2("c3Cand2", "Quadratic coefficient", 0.3, -1., 1.); // c3: quadratic coefficient
+  RooRealVar c3("c3", "Quadratic coefficient", 0.3, 0., 1.);           // c3: quadratic coefficient
+  RooRealVar c3Cand2("c3Cand2", "Quadratic coefficient", 0.3, 0., 1.); // c3: quadratic coefficient
 
   RooRealVar c3Corr("c3Corr", "Corrected Quadratic coefficient", 0.3, -1., 1.);           // c3: quadratic coefficient
   RooRealVar c3Cand2Corr("c3Cand2Corr", "Corrected Quadratic coefficient", 0.3, -1., 1.); // c3: quadratic coefficient
+
+  RooRealVar c3CorrPrefit("c3CorrPrefit", "Corrected Prefit Quadratic coefficient", 0.3, -1., 1.);           // c3: quadratic coefficient
+  RooRealVar c3Cand2CorrPrefit("c3Cand2CorrPrefit", "Corrected Prefit Quadratic coefficient", 0.3, -1., 1.); // c3: quadratic coefficient
 
   RooAbsPdf *bkgFuncPoly2Cand1Prefit = new RooPolynomial("bkgFuncPoly2Cand1Prefit", "background prefit function of candidate 1", *massCand1, RooArgList(c1Prefit, c2Prefit, c3Prefit));
   RooAbsPdf *bkgFuncPoly2Cand2Prefit = new RooPolynomial("bkgFuncPoly2Cand2Prefit", "background prefit function of candidate 2", *massCand2, RooArgList(c1Cand2Prefit, c2Cand2Prefit, c3Cand2Prefit));
@@ -524,12 +549,17 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *bkgFuncPoly2Cand1Corr = new RooPolynomial("bkgFuncPoly2Cand1Corr", "Corrected background fit function of candidate 1", *massCand1, RooArgList(c1Corr, c2Corr, c3Corr));
   RooAbsPdf *bkgFuncPoly2Cand2Corr = new RooPolynomial("bkgFuncPoly2Cand2Corr", "Correctedbackground fit function of candidate 2", *massCand2, RooArgList(c1Corr, c2Cand2Corr, c3Cand2Corr));
 
+  RooAbsPdf *bkgFuncPoly2Cand1CorrPrefit = new RooPolynomial("bkgFuncPoly2Cand1CorrPrefit", "Corrected prefit background fit function of candidate 1", *massCand1, RooArgList(c1CorrPrefit, c2CorrPrefit, c3CorrPrefit));
+  RooAbsPdf *bkgFuncPoly2Cand2CorrPrefit = new RooPolynomial("bkgFuncPoly2Cand2CorrPrefit", "Corrected prefit background fit function of candidate 2", *massCand2, RooArgList(c1CorrPrefit, c2Cand2CorrPrefit, c3Cand2CorrPrefit));
+
   _workspace.import(*bkgFuncPoly2Cand1Prefit);
   _workspace.import(*bkgFuncPoly2Cand2Prefit);
   _workspace.import(*bkgFuncPoly2Cand1);
   _workspace.import(*bkgFuncPoly2Cand2);
   _workspace.import(*bkgFuncPoly2Cand1Corr);
   _workspace.import(*bkgFuncPoly2Cand2Corr);
+  _workspace.import(*bkgFuncPoly2Cand1CorrPrefit);
+  _workspace.import(*bkgFuncPoly2Cand2CorrPrefit);
 
   // bkg poly2 * expo: (c1 + c2*x + c3*x^2) * exp(tau*x)
   RooAbsPdf *bkgFuncExpPoly2Cand1Prefit = new RooProdPdf("bkgFuncExpPoly2Cand1Prefit", "Prefit Exponential * Polynomial", RooArgList(*bkgFuncExpoCand1Prefit, *bkgFuncPoly2Cand1Prefit));
@@ -541,12 +571,17 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *bkgFuncExpPoly2Cand1Corr = new RooProdPdf("bkgFuncExpPoly2Cand1Corr", "Corrected Exponential * Polynomial", RooArgList(*bkgFuncExpoCand1Corr, *bkgFuncPoly2Cand1Corr));
   RooAbsPdf *bkgFuncExpPoly2Cand2Corr = new RooProdPdf("bkgFuncExpPoly2Cand2Corr", "Corrected Exponential * Polynomial", RooArgList(*bkgFuncExpoCand2Corr, *bkgFuncPoly2Cand2Corr));
 
+  RooAbsPdf *bkgFuncExpPoly2Cand1CorrPrefit = new RooProdPdf("bkgFuncExpPoly2Cand1CorrPrefit", "Prefit Corrected Exponential * Polynomial", RooArgList(*bkgFuncExpoCand1CorrPrefit, *bkgFuncPoly2Cand1CorrPrefit));
+  RooAbsPdf *bkgFuncExpPoly2Cand2CorrPrefit = new RooProdPdf("bkgFuncExpPoly2Cand2CorrPrefit", "Prefit Corrected Exponential * Polynomial", RooArgList(*bkgFuncExpoCand2CorrPrefit, *bkgFuncPoly2Cand2CorrPrefit));
+
   _workspace.import(*bkgFuncExpPoly2Cand1Prefit, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly2Cand2Prefit, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly2Cand1, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly2Cand2, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly2Cand1Corr, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly2Cand2Corr, RooFit::RecycleConflictNodes());
+  _workspace.import(*bkgFuncExpPoly2Cand1CorrPrefit, RooFit::RecycleConflictNodes());
+  _workspace.import(*bkgFuncExpPoly2Cand2CorrPrefit, RooFit::RecycleConflictNodes());
 
   // bkg poly1 * expo: (c1 + c2*x) * exp(tau*x)
   RooAbsPdf *bkgFuncExpPoly1Cand1Prefit = new RooProdPdf("bkgFuncExpPoly1Cand1Prefit", "Prefit Exponential * Polynomial", RooArgList(*bkgFuncExpoCand1Prefit, *bkgFuncPoly1Cand1Prefit));
@@ -558,12 +593,17 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *bkgFuncExpPoly1Cand1Corr = new RooProdPdf("bkgFuncExpPoly1Cand1Corr", "Corr Exponential * Polynomial", RooArgList(*bkgFuncExpoCand1Corr, *bkgFuncPoly1Cand1Corr));
   RooAbsPdf *bkgFuncExpPoly1Cand2Corr = new RooProdPdf("bkgFuncExpPoly1Cand2Corr", "Corr Exponential * Polynomial", RooArgList(*bkgFuncExpoCand2Corr, *bkgFuncPoly1Cand2Corr));
 
+  RooAbsPdf *bkgFuncExpPoly1Cand1CorrPrefit = new RooProdPdf("bkgFuncExpPoly1Cand1CorrPrefit", "Prefit Corr Exponential * Polynomial", RooArgList(*bkgFuncExpoCand1CorrPrefit, *bkgFuncPoly1Cand1CorrPrefit));
+  RooAbsPdf *bkgFuncExpPoly1Cand2CorrPrefit = new RooProdPdf("bkgFuncExpPoly1Cand2CorrPrefit", "Prefit Corr Exponential * Polynomial", RooArgList(*bkgFuncExpoCand2CorrPrefit, *bkgFuncPoly1Cand2CorrPrefit));
+
   _workspace.import(*bkgFuncExpPoly1Cand1Prefit, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly1Cand2Prefit, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly1Cand1, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly1Cand2, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly1Cand1Corr, RooFit::RecycleConflictNodes());
   _workspace.import(*bkgFuncExpPoly1Cand2Corr, RooFit::RecycleConflictNodes());
+  _workspace.import(*bkgFuncExpPoly1Cand1CorrPrefit, RooFit::RecycleConflictNodes());
+  _workspace.import(*bkgFuncExpPoly1Cand2CorrPrefit, RooFit::RecycleConflictNodes());
 
 
   // bkg a *exp(b*x + c*x^2)
@@ -591,6 +631,14 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooRealVar bExp2Cand2Corr("bExp2Cand2Corr", "bExp2Cand2Corr", 0.04, -0.5, 0.5); // bExp2: linear coefficient in the exponential
   RooRealVar cExp2Cand2Corr("cExp2Cand2Corr", "cExp2Cand2Corr", -0.6, -3.5, 1.); // cExp2: quadratic coefficient in the exponential
 
+  RooRealVar aExp2CorrPrefit("aExp2CorrPrefit", "aExp2CorrPrefit", 5000, -1e3, 1e5); // aExp2: normalisation of the function
+  RooRealVar bExp2CorrPrefit("bExp2CorrPrefit", "bExp2CorrPrefit", 0.04, -0.5, 0.5); // bExp2: linear coefficient in the exponential
+  RooRealVar cExp2CorrPrefit("cExp2CorrPrefit", "cExp2CorrPrefit", -0.6, -3.5, 1.); // cExp2: quadratic coefficient in the exponential
+
+  RooRealVar aExp2Cand2CorrPrefit("aExp2Cand2CorrPrefit", "aExp2Cand2CorrPrefit", 5000, -1e3, 1e5); // aExp2: normalisation of the function
+  RooRealVar bExp2Cand2CorrPrefit("bExp2Cand2CorrPrefit", "bExp2Cand2CorrPrefit", 0.04, -0.5, 0.5); // bExp2: linear coefficient in the exponential
+  RooRealVar cExp2Cand2CorrPrefit("cExp2Cand2CorrPrefit", "cExp2Cand2CorrPrefit", -0.6, -3.5, 1.); // cExp2: quadratic coefficient in the exponential
+
   RooAbsPdf *bkgFuncExp2Cand1Prefit = new RooGenericPdf("bkgFuncExp2Cand1Prefit", "bkgFuncExp2Cand1Prefit", "@1*exp(@2*@0+@3*@0*@0)", RooArgList(*massCand1, aExp2Prefit, bExp2Prefit, cExp2Prefit));
   RooAbsPdf *bkgFuncExp2Cand2Prefit = new RooGenericPdf("bkgFuncExp2Cand2Prefit", "bkgFuncExp2Cand2Prefit", "@1*exp(@2*@0+@3*@0*@0)", RooArgList(*massCand2, aExp2Prefit, bExp2Cand2Prefit, cExp2Cand2Prefit));
 
@@ -600,12 +648,17 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *bkgFuncExp2Cand1Corr = new RooGenericPdf("bkgFuncExp2Cand1Corr", "bkgFuncExp2Cand1Corr", "@1*exp(@2*@0+@3*@0*@0)", RooArgList(*massCand1, aExp2Corr, bExp2Corr, cExp2Corr));
   RooAbsPdf *bkgFuncExp2Cand2Corr = new RooGenericPdf("bkgFuncExp2Cand2Corr", "bkgFuncExp2Cand2Corr", "@1*exp(@2*@0+@3*@0*@0)", RooArgList(*massCand2, aExp2Corr, bExp2Cand2Corr, cExp2Cand2Corr));
 
+  RooAbsPdf *bkgFuncExp2Cand1CorrPrefit = new RooGenericPdf("bkgFuncExp2Cand1CorrPrefit", "bkgFuncExp2Cand1CorrPrefit", "@1*exp(@2*@0+@3*@0*@0)", RooArgList(*massCand1, aExp2CorrPrefit, bExp2CorrPrefit, cExp2CorrPrefit));
+  RooAbsPdf *bkgFuncExp2Cand2CorrPrefit = new RooGenericPdf("bkgFuncExp2Cand2CorrPrefit", "bkgFuncExp2Cand2CorrPrefit", "@1*exp(@2*@0+@3*@0*@0)", RooArgList(*massCand2, aExp2CorrPrefit, bExp2Cand2CorrPrefit, cExp2Cand2CorrPrefit));
+
   _workspace.import(*bkgFuncExp2Cand1Prefit);
   _workspace.import(*bkgFuncExp2Cand2Prefit);
   _workspace.import(*bkgFuncExp2Cand1);
   _workspace.import(*bkgFuncExp2Cand2);
   _workspace.import(*bkgFuncExp2Cand1Corr);
   _workspace.import(*bkgFuncExp2Cand2Corr);
+  _workspace.import(*bkgFuncExp2Cand1CorrPrefit);
+  _workspace.import(*bkgFuncExp2Cand2CorrPrefit);
 
   /// | ------------------------------------------------------------------ |
   /// | ----------------------- SIGNAL FUNCTIONS ------------------------- |
@@ -620,6 +673,9 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooRealVar meanCorr("meanCorr", "Corr mean for signal fit", 1.85, 1.83, 1.9);
   RooRealVar sigmaCorr("sigmaCorr", "Corr sigma for signal", 0.02, 0.01, 0.04);
 
+  RooRealVar meanCorrPrefit("meanCorrPrefit", "Corr mean for signal fit", 1.85, 1.83, 1.9);
+  RooRealVar sigmaCorrPrefit("sigmaCorrPrefit", "Corr sigma for signal", 0.02, 0.01, 0.04);
+
   RooRealVar meanCand2Prefit("meanCand2Prefit", "Prefit mean for signal fit", 1.85, 1.83, 1.9);
   RooRealVar sigmaCand2Prefit("sigmaCand2Prefit", "Prefit sigma for signal", 0.02, 0.01, 0.04);
 
@@ -629,14 +685,20 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooRealVar meanCand2Corr("meanCand2Corr", "Corr mean for signal fit", 1.85, 1.83, 1.9);
   RooRealVar sigmaCand2Corr("sigmaCand2Corr", "Corr sigma for signal", 0.02, 0.01, 0.04);
 
+  RooRealVar meanCand2CorrPrefit("meanCand2CorrPrefit", "Corr mean for signal fit", 1.85, 1.83, 1.9);
+  RooRealVar sigmaCand2CorrPrefit("sigmaCand2CorrPrefit", "Corr sigma for signal", 0.02, 0.01, 0.04);
+
   RooAbsPdf *sgnFuncGausCand1Prefit = new RooGaussian("sgnFuncGausCand1Prefit", "Prefit signal pdf of candidate 1", *massCand1, meanPrefit, sigmaPrefit);
-  RooAbsPdf *sgnFuncGausCand2Prefit = new RooGaussian("sgnFuncGausCand2Prefit", "Prefit signal pdf of candidate 2", *massCand2, meanPrefit, sigmaPrefit);
+  RooAbsPdf *sgnFuncGausCand2Prefit = new RooGaussian("sgnFuncGausCand2Prefit", "Prefit signal pdf of candidate 2", *massCand2, meanCand2Prefit, sigmaCand2Prefit);
 
   RooAbsPdf *sgnFuncGausCand1 = new RooGaussian("sgnFuncGausCand1", "signal pdf of candidate 1", *massCand1, mean, sigma);
-  RooAbsPdf *sgnFuncGausCand2 = new RooGaussian("sgnFuncGausCand2", "signal pdf of candidate 2", *massCand2, mean, sigma);
+  RooAbsPdf *sgnFuncGausCand2 = new RooGaussian("sgnFuncGausCand2", "signal pdf of candidate 2", *massCand2, meanCand2, sigmaCand2);
 
   RooAbsPdf *sgnFuncGausCand1Corr = new RooGaussian("sgnFuncGausCand1Corr", "Corr signal pdf of candidate 1", *massCand1, meanCorr, sigmaCorr);
-  RooAbsPdf *sgnFuncGausCand2Corr = new RooGaussian("sgnFuncGausCand2Corr", "Corr signal pdf of candidate 2", *massCand2, meanCorr, sigmaCorr);
+  RooAbsPdf *sgnFuncGausCand2Corr = new RooGaussian("sgnFuncGausCand2Corr", "Corr signal pdf of candidate 2", *massCand2, meanCand2Corr, sigmaCand2Corr);
+
+  RooAbsPdf *sgnFuncGausCand1CorrPrefit = new RooGaussian("sgnFuncGausCand1CorrPrefit", "Corr signal pdf of candidate 1", *massCand1, meanCorrPrefit, sigmaCorrPrefit);
+  RooAbsPdf *sgnFuncGausCand2CorrPrefit = new RooGaussian("sgnFuncGausCand2CorrPrefit", "Corr signal pdf of candidate 2", *massCand2, meanCand2CorrPrefit, sigmaCand2CorrPrefit);
 
   _workspace.import(*sgnFuncGausCand1Prefit);
   _workspace.import(*sgnFuncGausCand2Prefit);
@@ -644,6 +706,8 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   _workspace.import(*sgnFuncGausCand2);
   _workspace.import(*sgnFuncGausCand1Corr);
   _workspace.import(*sgnFuncGausCand2Corr);
+  _workspace.import(*sgnFuncGausCand1CorrPrefit);
+  _workspace.import(*sgnFuncGausCand2CorrPrefit);
 
   RooRealVar alpha1("alpha1", "Alpha (transition)", 1.595, 1.4, 1.8);
   RooRealVar n1("n1", "n (steepness of tail)", 2.999, 2.8, 3.2);
@@ -664,12 +728,17 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *sgnFuncCBCand1Corr = new BifurcatedCB("sgnFuncCBCand1Corr", "Corr signal pdf of candidate 1", *massCand1, meanCorr, sigmaCorr, alpha1, n1, alpha2, n2);
   RooAbsPdf *sgnFuncCBCand2Corr = new BifurcatedCB("sgnFuncCBCand2Corr", "Corr signal pdf of candidate 2", *massCand2, meanCorr, sigmaCorr, alpha1, n1, alpha2, n2);
 
+  RooAbsPdf *sgnFuncCBCand1CorrPrefit = new BifurcatedCB("sgnFuncCBCand1CorrPrefit", "Corr signal pdf of candidate 1", *massCand1, meanCorrPrefit, sigmaCorrPrefit, alpha1, n1, alpha2, n2);
+  RooAbsPdf *sgnFuncCBCand2CorrPrefit = new BifurcatedCB("sgnFuncCBCand2CorrPrefit", "Corr signal pdf of candidate 2", *massCand2, meanCorrPrefit, sigmaCorrPrefit, alpha1, n1, alpha2, n2);
+
   _workspace.import(*sgnFuncCBCand1Prefit);
   _workspace.import(*sgnFuncCBCand2Prefit);
   _workspace.import(*sgnFuncCBCand1);
   _workspace.import(*sgnFuncCBCand2);
   _workspace.import(*sgnFuncCBCand1Corr);
   _workspace.import(*sgnFuncCBCand2Corr);
+  _workspace.import(*sgnFuncCBCand1CorrPrefit);
+  _workspace.import(*sgnFuncCBCand2CorrPrefit);
 
   /// | ------------------------------------------------------------------ |
   /// | ------------------- REFLECTION FUNCTIONS ------------------------- |
@@ -684,6 +753,9 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooRealVar meanReflCorr("meanReflCorr", "Corr mean for reflections", 1.85, 0.0, 2.15);
   RooRealVar sigmaReflCorr("sigmaReflCorr", "Corr sigma for reflection", 0.012, 0.0001, 0.3);
 
+  RooRealVar meanReflCorrPrefit("meanReflCorrPrefit", "Prefit Corr mean for reflections", 1.85, 0.0, 2.15);
+  RooRealVar sigmaReflCorrPrefit("sigmaReflCorrPrefit", "Prefit Corr sigma for reflection", 0.012, 0.0001, 0.3);
+
   RooAbsPdf *reflFuncGausCand1Prefit = new RooGaussian("reflFuncGausCand1Prefit", "Prefit reflection pdf of candidate 1", *massCand1, meanReflPrefit, sigmaReflPrefit);
   RooAbsPdf *reflFuncGausCand2Prefit = new RooGaussian("reflFuncGausCand2Prefit", "Prefit reflection pdf of candidate 2", *massCand2, meanReflPrefit, sigmaReflPrefit);
 
@@ -693,12 +765,17 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *reflFuncGausCand1Corr = new RooGaussian("reflFuncGausCand1Corr", "Corr reflection pdf of candidate 1", *massCand1, meanReflCorr, sigmaReflCorr);
   RooAbsPdf *reflFuncGausCand2Corr = new RooGaussian("reflFuncGausCand2Corr", "Corr reflection pdf of candidate 2", *massCand2, meanReflCorr, sigmaReflCorr);
 
+  RooAbsPdf *reflFuncGausCand1CorrPrefit = new RooGaussian("reflFuncGausCand1CorrPrefit", "Corr reflection pdf of candidate 1", *massCand1, meanReflCorrPrefit, sigmaReflCorrPrefit);
+  RooAbsPdf *reflFuncGausCand2CorrPrefit = new RooGaussian("reflFuncGausCand2CorrPrefit", "Corr reflection pdf of candidate 2", *massCand2, meanReflCorrPrefit, sigmaReflCorrPrefit);
+
   _workspace.import(*reflFuncGausCand1Prefit);
   _workspace.import(*reflFuncGausCand2Prefit);
   _workspace.import(*reflFuncGausCand1);
   _workspace.import(*reflFuncGausCand2);
   _workspace.import(*reflFuncGausCand1Corr);
   _workspace.import(*reflFuncGausCand2Corr);
+  _workspace.import(*reflFuncGausCand1CorrPrefit);
+  _workspace.import(*reflFuncGausCand2CorrPrefit);
 
   // reflection double gaussian
   RooRealVar meanReflDoubleGausPrefit("meanReflDoubleGausPrefit", "Prefit mean for reflection double gaussian", 1.85, 0.0, 1.90);
@@ -713,6 +790,10 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooRealVar sigmaReflDoubleGausCorr("sigmaReflDoubleGausCorr", "Corr sigmaReflDoubleGaus", 0.012, 0.0001, 0.2);
   RooRealVar fracReflCorr("fracReflCorr", "Corr frac of the two reflected gaussians", 0.5, 0, 1.);
 
+  RooRealVar meanReflDoubleGausCorrPrefit("meanReflDoubleGausCorrPrefit", "Prefit Corr mean for reflection double gaussian", 1.85, 0.0, 1.90);
+  RooRealVar sigmaReflDoubleGausCorrPrefit("sigmaReflDoubleGausCorrPrefit", "Prefit Corr sigmaReflDoubleGaus", 0.012, 0.0001, 0.2);
+  RooRealVar fracReflCorrPrefit("fracReflCorrPrefit", "Prefit Corr frac of the two reflected gaussians", 0.5, 0, 1.);
+
   //    Second gaussian definition
   RooAbsPdf *relfFuncSecondGausCand1Prefit = new RooGaussian("relfFuncSecondGausCand1Prefit", "relfFuncSecondGausCand1Prefit", *massCand1, meanReflDoubleGausPrefit, sigmaReflDoubleGausPrefit);
   RooAbsPdf *relfFuncSecondGausCand2Prefit = new RooGaussian("relfFuncSecondGausCand2Prefit", "relfFuncSecondGausCand2Prefit", *massCand2, meanReflDoubleGausPrefit, sigmaReflDoubleGausPrefit);
@@ -722,6 +803,10 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
 
   RooAbsPdf *relfFuncSecondGausCand1Corr = new RooGaussian("relfFuncSecondGausCand1Corr", "relfFuncSecondGausCand1Corr", *massCand1, meanReflDoubleGausCorr, sigmaReflDoubleGausCorr);
   RooAbsPdf *relfFuncSecondGausCand2Corr = new RooGaussian("relfFuncSecondGausCand2Corr", "relfFuncSecondGausCand2Corr", *massCand2, meanReflDoubleGausCorr, sigmaReflDoubleGausCorr);
+
+  RooAbsPdf *relfFuncSecondGausCand1CorrPrefit = new RooGaussian("relfFuncSecondGausCand1CorrPrefit", "relfFuncSecondGausCand1CorrPrefit", *massCand1, meanReflDoubleGausCorrPrefit, sigmaReflDoubleGausCorrPrefit);
+  RooAbsPdf *relfFuncSecondGausCand2CorrPrefit = new RooGaussian("relfFuncSecondGausCand2CorrPrefit", "relfFuncSecondGausCand2CorrPrefit", *massCand2, meanReflDoubleGausCorrPrefit, sigmaReflDoubleGausCorrPrefit);
+
   //    Compose the final double gaussian
   RooAbsPdf *reflFuncDoubleGausCand1Prefit = new RooAddPdf("reflFuncDoubleGausCand1Prefit", "Prefit reflection pdf of candidate 1", RooArgList(*reflFuncGausCand1Prefit, *relfFuncSecondGausCand1Prefit), fracReflPrefit);
   RooAbsPdf *reflFuncDoubleGausCand2Prefit = new RooAddPdf("reflFuncDoubleGausCand2Prefit", "Prefit reflection pdf of candidate 2", RooArgList(*reflFuncGausCand2Prefit, *relfFuncSecondGausCand2Prefit), fracReflPrefit);
@@ -732,12 +817,17 @@ void InvMassFitter2D::fillWorkspace(RooDataSet *dataset)
   RooAbsPdf *reflFuncDoubleGausCand1Corr = new RooAddPdf("reflFuncDoubleGausCand1Corr", "Corr reflection pdf of candidate 1", RooArgList(*reflFuncGausCand1Corr, *relfFuncSecondGausCand1Corr), fracReflCorr);
   RooAbsPdf *reflFuncDoubleGausCand2Corr = new RooAddPdf("reflFuncDoubleGausCand2Corr", "Corr reflection pdf of candidate 2", RooArgList(*reflFuncGausCand2Corr, *relfFuncSecondGausCand2Corr), fracReflCorr);
 
-  _workspace.import(*reflFuncDoubleGausCand1Prefit);
-  _workspace.import(*reflFuncDoubleGausCand2Prefit);
-  _workspace.import(*reflFuncDoubleGausCand1);
-  _workspace.import(*reflFuncDoubleGausCand2);
-  _workspace.import(*reflFuncDoubleGausCand1Corr);
-  _workspace.import(*reflFuncDoubleGausCand2Corr);
+  RooAbsPdf *reflFuncDoubleGausCand1CorrPrefit = new RooAddPdf("reflFuncDoubleGausCand1CorrPrefit", "Prefit Corr reflection pdf of candidate 1", RooArgList(*reflFuncGausCand1CorrPrefit, *relfFuncSecondGausCand1CorrPrefit), fracReflCorrPrefit);
+  RooAbsPdf *reflFuncDoubleGausCand2CorrPrefit = new RooAddPdf("reflFuncDoubleGausCand2CorrPrefit", "Prefit Corr reflection pdf of candidate 2", RooArgList(*reflFuncGausCand2CorrPrefit, *relfFuncSecondGausCand2CorrPrefit), fracReflCorrPrefit);
+
+  _workspace.import(*reflFuncDoubleGausCand1Prefit, RooFit::RecycleConflictNodes());
+  _workspace.import(*reflFuncDoubleGausCand2Prefit, RooFit::RecycleConflictNodes());
+  _workspace.import(*reflFuncDoubleGausCand1, RooFit::RecycleConflictNodes());
+  _workspace.import(*reflFuncDoubleGausCand2, RooFit::RecycleConflictNodes());
+  _workspace.import(*reflFuncDoubleGausCand1Corr, RooFit::RecycleConflictNodes());
+  _workspace.import(*reflFuncDoubleGausCand2Corr, RooFit::RecycleConflictNodes());
+  _workspace.import(*reflFuncDoubleGausCand1CorrPrefit, RooFit::RecycleConflictNodes());
+  _workspace.import(*reflFuncDoubleGausCand2CorrPrefit, RooFit::RecycleConflictNodes());
 
   cout << "Workspace filled with functions" << endl;
 }
@@ -785,13 +875,38 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   RooAbsPdf *bkgPdfCand2Prefit;
   RooAbsPdf *sgnPdfCand1Prefit;
   RooAbsPdf *sgnPdfCand2Prefit;
+
+  RooAbsPdf *bkgPdfCand1PrefitCorr;
+  RooAbsPdf *bkgPdfCand2PrefitCorr;
+  RooAbsPdf *sgnPdfCand1PrefitCorr;
+  RooAbsPdf *sgnPdfCand2PrefitCorr;
+
   RooAbsPdf *reflPdfCand1Prefit;
   RooAbsPdf *reflPdfCand2Prefit;
+  RooAbsPdf *reflPdfCand1PrefitCorr;
+  RooAbsPdf *reflPdfCand2PrefitCorr;
 
   selectFitFunctions(sgnPdfCand1Prefit, sgnPdfCand2Prefit, bkgPdfCand1Prefit, bkgPdfCand2Prefit, reflPdfCand1Prefit, reflPdfCand2Prefit, Prefit);
 
-  RooFitResult *prefitResultCand1 = fitAndPlot1DCandidate(sgnPdfCand1Prefit, bkgPdfCand1Prefit, *massCand1, dataset, "Cand1", Form("fit_result_cand1_%s", "prefit"));
-  RooFitResult *prefitResultCand2 = fitAndPlot1DCandidate(sgnPdfCand2Prefit, bkgPdfCand2Prefit, *massCand2, dataset, "Cand2", Form("fit_result_cand2_%s", "prefit"));
+  selectFitFunctions(sgnPdfCand1PrefitCorr, sgnPdfCand2PrefitCorr, bkgPdfCand1PrefitCorr, bkgPdfCand2PrefitCorr, reflPdfCand1PrefitCorr, reflPdfCand2PrefitCorr, PrefitCorr);
+
+  RooFitResult *prefitResultCand1 = nullptr;
+  RooFitResult *prefitResultCand2 = nullptr;
+  RooFitResult *prefitCorrResultCand1 = nullptr;
+  RooFitResult *prefitCorrResultCand2 = nullptr;
+  if (doReflections) {
+    prefitResultCand1 = fitAndPlot1DCandidate(sgnPdfCand1Prefit, bkgPdfCand1Prefit, reflPdfCand1Prefit, *massCand1, dataset, "Cand1", Form("fit_result_cand1_%s", "prefit"));
+    prefitResultCand2 = fitAndPlot1DCandidate(sgnPdfCand2Prefit, bkgPdfCand2Prefit, reflPdfCand2Prefit, *massCand2, dataset, "Cand2", Form("fit_result_cand2_%s", "prefit"));
+
+    prefitCorrResultCand1 = fitAndPlot1DCandidate(sgnPdfCand1PrefitCorr, bkgPdfCand1PrefitCorr, reflPdfCand1PrefitCorr, *massCand1, weightedDataset, "Cand1", Form("fit_result_weighted_cand1_%s", "prefitCorr"));
+    prefitCorrResultCand2 = fitAndPlot1DCandidate(sgnPdfCand2PrefitCorr, bkgPdfCand2PrefitCorr, reflPdfCand2PrefitCorr, *massCand2, weightedDataset, "Cand2", Form("fit_result_weighted_cand2_%s", "prefitCorr"));
+  } else {
+    prefitResultCand1 = fitAndPlot1DCandidate(sgnPdfCand1Prefit, bkgPdfCand1Prefit, *massCand1, dataset, "Cand1", Form("fit_result_cand1_%s", "prefit"));
+    prefitResultCand2 = fitAndPlot1DCandidate(sgnPdfCand2Prefit, bkgPdfCand2Prefit, *massCand2, dataset, "Cand2", Form("fit_result_cand2_%s", "prefit"));
+
+    prefitCorrResultCand1 = fitAndPlot1DCandidate(sgnPdfCand1PrefitCorr, bkgPdfCand1PrefitCorr, *massCand1, weightedDataset, "Cand1", Form("fit_result_weighted_cand1_%s", "prefitCorr"));
+    prefitCorrResultCand2 = fitAndPlot1DCandidate(sgnPdfCand2PrefitCorr, bkgPdfCand2PrefitCorr, *massCand2, weightedDataset, "Cand2", Form("fit_result_weighted_cand2_%s", "prefitCorr"));
+  }
 
   /// ----------------------------------------------------------
   /// ------------ LOAD AND FIX PARAMETERS ---------------------
@@ -818,9 +933,14 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
 
   const RooArgList& paramsPrefitCand1 = prefitResultCand1->floatParsFinal();
   const RooArgList& paramsPrefitCand2 = prefitResultCand2->floatParsFinal();
+  const RooArgList& paramsPrefitCorrCand1 = prefitCorrResultCand1->floatParsFinal();
+  const RooArgList& paramsPrefitCorrCand2 = prefitCorrResultCand2->floatParsFinal();
 
   setPrefitParameters(paramsPrefitCand1);
   setPrefitParameters(paramsPrefitCand2);
+
+  setPrefitParameters(paramsPrefitCorrCand1);
+  setPrefitParameters(paramsPrefitCorrCand2);
 
   RooRealVar *mean = _workspace.var("mean");
   RooRealVar *sigma = _workspace.var("sigma");
@@ -866,12 +986,12 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   RooFormulaVar nReflSgn("nReflSgn", "fraction of refl x sgn", "@0 * @1", RooArgList(*nRefl1, *nSgn2));
 
   // WEIGHTED PARAMETERS
-  RooRealVar *nBkgCorr1 = new RooRealVar("nBkgCorr1", "Corrected background yield of cand 1", 50000, 100, 200000);
-  RooRealVar *nSgnCorr1 = new RooRealVar("nSgnCorr1", "Corrected signal yield of cand1", 6000, 10.0, 50000.0);
+  RooRealVar *nBkgCorr1 = new RooRealVar("nBkgCorr1", "Corrected background yield of cand 1", 10000, 100, 200000);
+  RooRealVar *nSgnCorr1 = new RooRealVar("nSgnCorr1", "Corrected signal yield of cand1", 2500, 10.0, 50000.0);
   RooFormulaVar *nReflCorr1 = new RooFormulaVar("nReflCorr1", "Corrected reflected signal yield of cand1", "@0 * @1", RooArgList(_reflOverSgn, *nSgnCorr1));
 
-  RooRealVar *nBkgCorr2 = new RooRealVar("nBkgCorr2", "Corrected background yield of cand2", 50000, 100, 200000);
-  RooRealVar *nSgnCorr2 = new RooRealVar("nSgnCorr2", "Corrected signal yield of cand2", 5000, 10.0, 50000.0);
+  RooRealVar *nBkgCorr2 = new RooRealVar("nBkgCorr2", "Corrected background yield of cand2", 10000, 100, 200000);
+  RooRealVar *nSgnCorr2 = new RooRealVar("nSgnCorr2", "Corrected signal yield of cand2", 2500, 10.0, 50000.0);
   RooFormulaVar *nReflCorr2 = new RooFormulaVar("nReflCorr2", "Corrected reflected signal yield of cand 2", "@0 * @1", RooArgList(_reflOverSgn, *nSgnCorr2));
 
   RooFormulaVar nBkgBkgCorr("nBkgBkgCorr", "Corrected fraction of bkg x bkg", "@0 * @1", RooArgList(*nBkgCorr1, *nBkgCorr2));
@@ -987,7 +1107,7 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
                                                                //RooFit::SumW2Error(kTRUE),
                                                                RooFit::Minimizer("Minuit2", "Migrad"),
                                                                RooFit::Range(_massMin, _massMax),
-                                                               RooFit::Strategy(0),
+                                                               RooFit::Strategy(1),
                                                                //RooFit::Optimize(2),
                                                                RooFit::MaxCalls(1000), // Adjust max calls as needed
                                                                RooFit::PrintLevel(-1)   // Suppress verbose output
@@ -995,27 +1115,31 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   resultConstrained->correlationMatrix().Print();
   if (resultConstrained->status() == 0) {
     std::cout << "Fit Converged!" << std::endl;
+  } else if (resultConstrained->status() == 1) {
+    std::cout << "Fit did not fully converge (status=1), but covariance matrix is OK." << std::endl;
   } else {
-    std::cout << "Fit did not converge." << std::endl;
+    std::cout << "Fit failed (status=" << resultConstrained->status() << ")." << std::endl;
   }
   resultConstrained->Print("v");
 
   const RooArgList& paramsRawfit = resultConstrained->floatParsFinal();
 
-  setCorrectedParameters(paramsRawfit);
-
   RooFitResult *resultConstrainedCorr = modelWithConstraintCorr->fitTo(*weightedDataset, RooFit::Save(),
                                                                        RooFit::SumW2Error(kTRUE),
                                                                        RooFit::Minimizer("Minuit2", "Migrad"),
-                                                                       RooFit::Strategy(0),
-                                                                       RooFit::MaxCalls(10000), // Adjust max calls as needed
+                                                                       RooFit::Range(_massMin, _massMax),
+                                                                       RooFit::Strategy(1),
+                                                                       //RooFit::Optimize(2),
+                                                                       RooFit::MaxCalls(1000), // Adjust max calls as needed
                                                                        RooFit::PrintLevel(-1)   // Suppress verbose output
   );
 
   if (resultConstrainedCorr->status() == 0) {
     std::cout << "Fit Converged!" << std::endl;
+  } else if (resultConstrainedCorr->status() == 1) {
+    std::cout << "Fit did not fully converge (status=1), but covariance matrix is OK." << std::endl;
   } else {
-    std::cout << "Fit did not converge." << std::endl;
+    std::cout << "Fit failed (status=" << resultConstrainedCorr->status() << ")." << std::endl;
   }
 
   resultConstrainedCorr->Print("v");
@@ -1045,11 +1169,11 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   cout << "Background x Background ";
   RooRealVar *yieldBkgBkg = getYieldInRange(resultConstrained, massCand1, massCand2, bkgBkgFunc2D, nBkgBkg, "3sigmaRange");
 
-  RooRealVar *yieldSgnRefl;
-  RooRealVar *yieldReflSgn;
-  RooRealVar *yieldBkgRefl;
-  RooRealVar *yieldReflBkg;
-  RooRealVar *yieldReflRefl;
+  RooRealVar *yieldSgnRefl = nullptr;
+  RooRealVar *yieldReflSgn = nullptr;
+  RooRealVar *yieldBkgRefl = nullptr;
+  RooRealVar *yieldReflBkg = nullptr;
+  RooRealVar *yieldReflRefl = nullptr;
   if (doReflections)
   {
     cout << "Signal x Reflected ";
@@ -1101,7 +1225,7 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   cout << "\n ---------------------------------------------- " << endl;
   cout << " ---------------------------------------------- \n\n\n"
        << endl;
-
+ cout << "joder" << endl;
   // Save these results in a histogram
   TH1D *hYields = new TH1D("hYields", "Raw Yields", 4, 0, 4); // 4 bins for SgnSgn, SgnBkg, BkgSgn, BkgBkg
   hYields->GetXaxis()->SetBinLabel(1, "SgnSgn");
@@ -1117,7 +1241,6 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   hYields->SetBinError(3, yieldBkgSgn->getError());
   hYields->SetBinContent(4, yieldBkgBkg->getVal());
   hYields->SetBinError(4, yieldBkgBkg->getError());
-
   if (doReflections)
   {
     hYields->SetBins(9, 0, 9);
@@ -1148,39 +1271,39 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
 
   cout << "\n\n ||||| EFFICIENCY CORRECTED INTEGRAL VALUES |||||" << endl;
   cout << "Signal x Signal ";
-  RooRealVar *yieldSgnSgnCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, sgnSgnFunc2D, nSgnSgnCorr, "3sigmaRange");
+  RooRealVar *yieldSgnSgnCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, sgnSgnFunc2DCorr, nSgnSgnCorr, "3sigmaRange");
 
   cout << "Signal x Background ";
-  RooRealVar *yieldSgnBkgCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, sgnBkgFunc2D, nSgnBkgCorr, "3sigmaRange");
+  RooRealVar *yieldSgnBkgCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, sgnBkgFunc2DCorr, nSgnBkgCorr, "3sigmaRange");
 
   cout << "Background x Signal ";
-  RooRealVar *yieldBkgSgnCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, bkgSgnFunc2D, nBkgSgnCorr, "3sigmaRange");
+  RooRealVar *yieldBkgSgnCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, bkgSgnFunc2DCorr, nBkgSgnCorr, "3sigmaRange");
 
   cout << "Background x Background ";
-  RooRealVar *yieldBkgBkgCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, bkgBkgFunc2D, nBkgBkgCorr, "3sigmaRange");
+  RooRealVar *yieldBkgBkgCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, bkgBkgFunc2DCorr, nBkgBkgCorr, "3sigmaRange");
 
-  RooRealVar *yieldSgnReflCorr;
-  RooRealVar *yieldReflSgnCorr;
-  RooRealVar *yieldBkgReflCorr;
-  RooRealVar *yieldReflBkgCorr;
-  RooRealVar *yieldReflReflCorr;
+  RooRealVar *yieldSgnReflCorr = nullptr;
+  RooRealVar *yieldReflSgnCorr = nullptr;
+  RooRealVar *yieldBkgReflCorr = nullptr;
+  RooRealVar *yieldReflBkgCorr = nullptr;
+  RooRealVar *yieldReflReflCorr = nullptr;
   if (doReflections)
   {
 
     cout << "Signal x Reflected ";
-    yieldSgnReflCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, sgnReflFunc2D, nSgnReflCorr, "3sigmaRange");
+    yieldSgnReflCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, sgnReflFunc2DCorr, nSgnReflCorr, "3sigmaRange");
 
     cout << "Reflected x Signal ";
-    yieldReflSgnCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, reflSgnFunc2D, nReflSgnCorr, "3sigmaRange");
+    yieldReflSgnCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, reflSgnFunc2DCorr, nReflSgnCorr, "3sigmaRange");
 
     cout << "Background x Reflected ";
-    yieldBkgReflCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, bkgReflFunc2D, nBkgReflCorr, "3sigmaRange");
+    yieldBkgReflCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, bkgReflFunc2DCorr, nBkgReflCorr, "3sigmaRange");
 
     cout << "Reflected x Background ";
-    yieldReflBkgCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, reflBkgFunc2D, nReflBkgCorr, "3sigmaRange");
+    yieldReflBkgCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, reflBkgFunc2DCorr, nReflBkgCorr, "3sigmaRange");
 
     cout << "Reflected x Reflected ";
-    yieldReflReflCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, reflReflFunc2D, nReflReflCorr, "3sigmaRange");
+    yieldReflReflCorr = getYieldInRange(resultConstrainedCorr, massCand1, massCand2, reflReflFunc2DCorr, nReflReflCorr, "3sigmaRange");
   }
   // Display results
   cout << "\n\n ||||| EFFICIENCY CORRECTED RESULTS ||||| " << endl;
@@ -1253,7 +1376,12 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
     hYieldsCorr->SetBinError(9, yieldReflReflCorr->getError());
   }
 
+  TH1F* hWidth = new TH1F("hWidth", "Width", 1, 0, 1);
+  hWidth->SetBinContent(1, sigma->getVal());
+  hWidth->SetBinError(1, sigma->getError());
+
   fout->cd();
+  hWidth->Write();
   hYields->Write();
   hYieldsCorr->Write();
 
@@ -1444,8 +1572,6 @@ void InvMassFitter2D::do2DFit(Bool_t draw, Bool_t doReflections, Bool_t isMc, TF
   // -- Plot pT distributions before and after correcting by efficiencies --
   // -----------------------------------------------------------------------
 
-  analyseKinematicDistributions(fout, dataset, "beforeEffs");
-  analyseKinematicDistributions(fout, weightedDataset, "afterEffs");
 
   resultConstrained->correlationMatrix().Print();
   if (resultConstrained->status() == 0)
@@ -1495,27 +1621,40 @@ void InvMassFitter2D::plot2DFit(TH2D *hMassCorrelations, TH2D *histFit, RooProdP
   if (draw)
   {
     TCanvas *c2d = new TCanvas(cName, cName, 1000, 700);
+    c2d->SetLeftMargin(0.1);
+    c2d->SetRightMargin(0.1);
+    c2d->SetTopMargin(0.2);
+    c2d->SetBottomMargin(0.1);
+
     histFit->SetLineColor(kRed);
-    histFit->SetLineWidth(2);
+    histFit->SetLineWidth(1);
     histFit->SetTitle("");
-    histFit->GetXaxis()->SetDecimals(2);
-    histFit->GetYaxis()->SetDecimals(2);
+    histFit->GetXaxis()->SetTitle("");
+    histFit->GetYaxis()->SetTitle("");
+    histFit->GetZaxis()->SetTitle("");
+
+    //histFit->GetXaxis()->SetDecimals(2);
+    //histFit->GetYaxis()->SetDecimals(2);
+    //histFit->GetZaxis()->SetMaxDigits(3);  // Forces scientific notation for large/small numbers
+
+    /* histFit->GetXaxis()->SetTicks(0);
+    histFit->GetYaxis()->SetTicks(0); */
+    //histFit->GetZaxis()->SetTicks(0);
 
     hMassCorrelations->GetXaxis()->SetDecimals(2);
     hMassCorrelations->GetYaxis()->SetDecimals(2);
     hMassCorrelations->GetXaxis()->SetTitle("#it{M}(D^{0}_{1}) (GeV/#it{c}^{2})");
     hMassCorrelations->GetYaxis()->SetTitle("#it{M}(D^{0}_{2}) (GeV/#it{c}^{2})");
     hMassCorrelations->GetZaxis()->SetTitle("Counts per (3.5 MeV/#it{c}^{2})^{2}");
+    hMassCorrelations->GetZaxis()->SetMaxDigits(3);  // Forces scientific notation for large/small numbers
     hMassCorrelations->GetXaxis()->CenterTitle();
     hMassCorrelations->GetYaxis()->CenterTitle();
-    hMassCorrelations->GetXaxis()->SetDecimals(2);
-    hMassCorrelations->GetYaxis()->SetDecimals(2);
     hMassCorrelations->GetXaxis()->SetTitleOffset(2);    // Adjust X-axis title offset
-    hMassCorrelations->GetYaxis()->SetTitleOffset(2);    // Adjust Y-axis title offset
-    hMassCorrelations->GetZaxis()->SetTitleOffset(1.55); // Adjust Z-axis title offset
+    hMassCorrelations->GetYaxis()->SetTitleOffset(2.2);    // Adjust Y-axis title offset
+    hMassCorrelations->GetZaxis()->SetTitleOffset(1.45); // Adjust Z-axis title offset
     hMassCorrelations->SetTitle("");
 
-    TPaveText *ptTitle = new TPaveText(0.12, 0.85, 0.4, 0.94, "brNDC");
+    TPaveText *ptTitle = new TPaveText(0.12, 0.8, 0.4, 0.94, "brNDC");
     ptTitle->SetTextFont(42);
     ptTitle->SetTextSize(0.04);
     ptTitle->SetBorderSize(0);
@@ -1523,10 +1662,10 @@ void InvMassFitter2D::plot2DFit(TH2D *hMassCorrelations, TH2D *histFit, RooProdP
     ptTitle->SetTextAlign(11);
 
     // Add text lines
-    ptTitle->AddText("#scale[1.35]{ALICE Work in progress}");
-    ptTitle->AddText("#scale[1.2]{pp, #sqrt{#it{s}} = 13.6 TeV}");
+    ptTitle->AddText("#scale[1.3]{ALICE Work in Progress}");
+    ptTitle->AddText("#scale[1.15]{pp, #sqrt{#it{s}} = 13.6 TeV}");
 
-    TPaveText *pt = new TPaveText(0.12, 0.69, 0.4, 0.85, "brNDC");
+    TPaveText *pt = new TPaveText(0.5, 0.69, 0.85, 0.93, "brNDC");
     pt->SetTextFont(42);
     pt->SetTextSize(0.04);
     pt->SetBorderSize(0);
@@ -1543,14 +1682,18 @@ void InvMassFitter2D::plot2DFit(TH2D *hMassCorrelations, TH2D *histFit, RooProdP
     {
       pt->AddText("D^{0}D^{0} + #bar{D}^{0}#bar{D}^{0} pairs");
     }
-    pt->AddText(Form("%.1f < #it{p}_{T} < %.1f GeV/#it{c}", _ptMin, _ptMax));
+    pt->AddText(Form("%.1f < #it{p}^{D}_{T} < %.1f GeV/#it{c}", _ptMin, _ptMax));
 
     gStyle->SetOptStat(0);
     hMassCorrelations->Draw("LEGO2");
-    histFit->Draw("sameLEGO0");
+    histFit->Draw("sameLEGO");
 
     ptTitle->Draw("same");
     pt->Draw("same");
+    TString c2dName_pdf = cName + ".pdf";
+    c2d->SaveAs(c2dName_pdf);
+    TString c2dName_eps = cName + ".eps";
+    c2d->SaveAs(c2dName_eps);
     fout->cd();
     c2d->Write();
 
@@ -1580,9 +1723,13 @@ void InvMassFitter2D::plotProjectionsAfterFit(RooFitResult *fitResult, RooProdPd
 
   RooPlot *frameCand1 = massCand1->frame(RooFit::Range(_massMin, _massMax), RooFit::Title("Invariant-mass of Candidate 1")); // define the frame to plot
   RooPlot *frameCand2 = massCand2->frame(RooFit::Range(_massMin, _massMax), RooFit::Title("Invariant-mass of Candidate 2")); // define the frame to plot
-
-  dataset->plotOn(frameCand1, RooFit::Name("data_cand1")); // plot data histogram on the frame
-  dataset->plotOn(frameCand2, RooFit::Name("data_cand2")); // plot data histogram on the frame
+  frameCand1->GetXaxis()->SetLabelSize(0.05);  // Increase font size for X-axis numbers
+  frameCand1->GetYaxis()->SetLabelSize(0.05);  // Increase font size for Y-axis numbers
+  
+  frameCand2->GetXaxis()->SetLabelSize(0.05);
+  frameCand2->GetYaxis()->SetLabelSize(0.05);
+  dataset->plotOn(frameCand1, RooFit::Name("data_cand1"), RooFit::DrawOption("pz"));
+  dataset->plotOn(frameCand2, RooFit::Name("data_cand2"), RooFit::DrawOption("pz"));
 
   RooDataHist rooDsBinned("rooDsBinned", "Binned version of dataset", RooArgSet(*massCand1, *massCand2), *dataset);
   // Compute chi^2
@@ -1596,14 +1743,22 @@ void InvMassFitter2D::plotProjectionsAfterFit(RooFitResult *fitResult, RooProdPd
   double chi2_ndf = chi2->getVal() / ndof;
   cout << "chi2: " << chi2->getVal() << ", ndof: " << ndof << ", chi2_ndf: " << chi2_ndf << endl;
 
-  TLegend *legend = new TLegend(0.6, 0.7, 0.9, 0.9);
-  TLegend *legend_2 = new TLegend(0.6, 0.7, 0.9, 0.9);
+  std::string histochiname = std::string("hChi2_ndf_") + suffix;
+  TH1F* hChi2_ndf = new TH1F(histochiname.c_str(), "#chi^{2}/ndf", 1, 0, 1);
+  hChi2_ndf->SetBinContent(1, chi2_ndf);
+  fout->cd();
+  hChi2_ndf->Write();
 
-  RooCurve *sgnReflFunc2DCurve;
-  RooCurve *bkgReflFunc2DCurve;
-  RooCurve *reflBkgFunc2DCurve;
-  RooCurve *reflSgnFunc2DCurve;
-  RooCurve *reflReflFunc2DCurve;
+  TLegend *legend = new TLegend(0.6, 0.55, 0.94, 0.79);
+  legend->SetBorderSize(0);
+  TLegend *legend_2 = new TLegend(0.55, 0.59, 0.89, 0.79);
+  legend_2->SetBorderSize(0);
+
+  RooCurve* sgnReflFunc2DCurve   = nullptr;
+  RooCurve* bkgReflFunc2DCurve   = nullptr;
+  RooCurve* reflBkgFunc2DCurve   = nullptr;
+  RooCurve* reflSgnFunc2DCurve   = nullptr;
+  RooCurve* reflReflFunc2DCurve  = nullptr;
   if (doReflections)
   {
     model->plotOn(frameCand1, Components((std::string("bkgReflFunc2D") + suffix).c_str()), LineWidth(2), LineStyle(2), LineColor(kViolet), Name("bkgReflFunc2D_curve"));
@@ -1627,41 +1782,58 @@ void InvMassFitter2D::plotProjectionsAfterFit(RooFitResult *fitResult, RooProdPd
   // Plot the components of the model and keep references to the returned RooCurve objects
   model->plotOn(frameCand1, Components((std::string("bkgBkgFunc2D") + suffix).c_str()), LineWidth(2), LineStyle(kDashed), LineColor(kRed), Name("bkgBkgFunc2D_curve"));
   RooCurve *bkgBkgFunc2DCurve = (RooCurve *)frameCand1->findObject("bkgBkgFunc2D_curve", RooCurve::Class());
-  model->plotOn(frameCand1, Components((std::string("sgnBkgFunc2D") + suffix).c_str()), LineStyle(2), LineWidth(2), LineColor(kOrange + 6), Name("sgnBkgFunc2D_curve"));
+  model->plotOn(frameCand1, Components((std::string("sgnBkgFunc2D") + suffix).c_str()), LineStyle(3), LineWidth(2), LineColor(kOrange + 6), Name("sgnBkgFunc2D_curve"));
   RooCurve *sgnBkgFunc2DCurve = (RooCurve *)frameCand1->findObject("sgnBkgFunc2D_curve", RooCurve::Class());
-  model->plotOn(frameCand1, Components((std::string("bkgSgnFunc2D") + suffix).c_str()), LineStyle(2), LineWidth(2), LineColor(kOrange), Name("bkgSgnFunc2D_curve"));
+  model->plotOn(frameCand1, Components((std::string("bkgSgnFunc2D") + suffix).c_str()), LineStyle(4), LineWidth(2), LineColor(kOrange), Name("bkgSgnFunc2D_curve"));
   RooCurve *bkgSgnFunc2DCurve = (RooCurve *)frameCand1->findObject("bkgSgnFunc2D_curve", RooCurve::Class());
-  model->plotOn(frameCand1, Components((std::string("sgnSgnFunc2D") + suffix).c_str()), LineWidth(2), LineStyle(1), LineColor(kGreen), Name("sgnSgnFunc2D_curve"));
+  model->plotOn(frameCand1, DrawOption("F"), Components((std::string("sgnSgnFunc2D") + suffix).c_str()), LineWidth(2), LineStyle(1), LineColor(kGreen +2), FillColor(kGreen -2), Name("sgnSgnFunc2D_curve"));
   RooCurve *sgnSgnFunc2DCurve = (RooCurve *)frameCand1->findObject("sgnSgnFunc2D_curve", RooCurve::Class());
 
   // Now cand 2
   model->plotOn(frameCand2, Components((std::string("bkgBkgFunc2D") + suffix).c_str()), LineWidth(2), LineStyle(kDashed), LineColor(kRed), Name("bkgBkgFunc2D_curve"));
-  model->plotOn(frameCand2, Components((std::string("sgnBkgFunc2D") + suffix).c_str()), LineStyle(2), LineWidth(2), LineColor(kOrange + 6), Name("sgnBkgFunc2D_curve"));
-  model->plotOn(frameCand2, Components((std::string("bkgSgnFunc2D") + suffix).c_str()), LineStyle(2), LineWidth(2), LineColor(kOrange), Name("bkgSgnFunc2D_curve"));
-  model->plotOn(frameCand2, Components((std::string("sgnSgnFunc2D") + suffix).c_str()), LineWidth(2), LineStyle(1), LineColor(kGreen), Name("sgnSgnFunc2D_curve"));
+  model->plotOn(frameCand2, Components((std::string("sgnBkgFunc2D") + suffix).c_str()), LineStyle(3), LineWidth(2), LineColor(kOrange + 6), Name("sgnBkgFunc2D_curve"));
+  model->plotOn(frameCand2, Components((std::string("bkgSgnFunc2D") + suffix).c_str()), LineStyle(4), LineWidth(2), LineColor(kOrange), Name("bkgSgnFunc2D_curve"));
+  model->plotOn(frameCand2, DrawOption("F"), Components((std::string("sgnSgnFunc2D") + suffix).c_str()), LineWidth(2), LineStyle(1), LineColor(kGreen + 2), FillColor(kGreen -2), Name("sgnSgnFunc2D_curve"));
 
   model->plotOn(frameCand1, Name("model_curve")); // Plot the full model
   RooCurve *modelMCCurve = (RooCurve *)frameCand1->findObject("model_curve", RooCurve::Class());
   model->plotOn(frameCand2, Name("model_curve")); // Plot the full model
 
   // Add entries to the legend
-  legend->AddEntry("data_cand1", "Data", "ep");              // Entry for data
-  legend->AddEntry(sgnSgnFunc2DCurve, "Sig 1 - Sig 2", "l"); // Entry for signal
-  legend->AddEntry(bkgBkgFunc2DCurve, "Bkg 1 - Bkg 2", "l"); // Entry for background
-  legend->AddEntry(sgnBkgFunc2DCurve, "Sig 1 - Bkg 2", "l"); // Entry for cross term sgn x bkg
-  legend->AddEntry(bkgSgnFunc2DCurve, "Bkg 1 - Sgn 2", "l"); // Entry for cross term bkg x sgn
+  legend->AddEntry("data_cand1", "Data", "zp");              // Entry for data
+  legend->AddEntry("model_curve", "Total fit", "l");              // Entry for data
+
+  if (strcmp(_pairType, "LS") == 0) {
+    legend->AddEntry(sgnSgnFunc2DCurve, "Sig. D^{0} - Sig. D^{0}", "l"); // Entry for signal
+    legend->AddEntry(bkgBkgFunc2DCurve, "Bkg. D^{0} - Bkg. D^{0}", "l"); // Entry for background
+    legend->AddEntry(sgnBkgFunc2DCurve, "Sig. D^{0} - Bkg. D^{0}", "l"); // Entry for cross term sgn x bkg
+    legend->AddEntry(bkgSgnFunc2DCurve, "Bkg. D^{0} - Sig. D^{0}", "l"); // Entry for cross term bkg x sgn
+  } else if (strcmp(_pairType, "OS") == 0) {
+    legend->AddEntry(sgnSgnFunc2DCurve, "Sig. D^{0} - Sig. #bar{D^{0}}", "l"); // Entry for signal
+    legend->AddEntry(bkgBkgFunc2DCurve, "Bkg. D^{0} - Bkg. #bar{D^{0}}", "l"); // Entry for background
+    legend->AddEntry(sgnBkgFunc2DCurve, "Sig. D^{0} - Bkg. #bar{D^{0}}", "l"); // Entry for cross term sgn x bkg
+    legend->AddEntry(bkgSgnFunc2DCurve, "Bkg. D^{0} - Sig. #bar{D^{0}}", "l"); // Entry for cross term bkg x sgn
+  }
 
   if (doReflections)
   {
-    legend_2->AddEntry(sgnReflFunc2DCurve, "Sig 1 - Refl 2", "l");   // Entry for cross term sgn x refl
-    legend_2->AddEntry(bkgReflFunc2DCurve, "Bkg 1 - Refl 2", "l");   // Entry for cross term bkg x refl
-    legend_2->AddEntry(reflSgnFunc2DCurve, "Refl 1 - Sig 2", "l");   // Entry for cross term refl x sgn
-    legend_2->AddEntry(reflBkgFunc2DCurve, "Refl 1 - Bkg 2", "l");   // Entry for cross term refl x bkg
-    legend_2->AddEntry(reflReflFunc2DCurve, "Refl 1 - Refl 2", "l"); // Entry for cross term refl x refl
+    if (strcmp(_pairType, "LS") == 0) {
+      legend_2->AddEntry(sgnReflFunc2DCurve, "Sig D^{0} - Refl D^{0}", "l");   // Entry for cross term sgn x refl
+      legend_2->AddEntry(bkgReflFunc2DCurve, "Bkg D^{0} - Refl D^{0}", "l");   // Entry for cross term bkg x refl
+      legend_2->AddEntry(reflSgnFunc2DCurve, "Refl D^{0} - Sig D^{0}", "l");   // Entry for cross term refl x sgn
+      legend_2->AddEntry(reflBkgFunc2DCurve, "Refl D^{0} - Bkg D^{0}", "l");   // Entry for cross term refl x bkg
+      legend_2->AddEntry(reflReflFunc2DCurve, "Refl D^{0} - Refl D^{0}", "l"); // Entry for cross term refl x refl
+    } else if (strcmp(_pairType, "OS") == 0) {
+      legend_2->AddEntry(sgnReflFunc2DCurve, "Sig D^{0} - Refl #bar{D^{0}}", "l");   // Entry for cross term sgn x refl
+      legend_2->AddEntry(bkgReflFunc2DCurve, "Bkg D^{0} - Refl #bar{D^{0}}", "l");   // Entry for cross term bkg x refl
+      legend_2->AddEntry(reflSgnFunc2DCurve, "Refl D^{0} - Sig #bar{D^{0}}", "l");   // Entry for cross term refl x sgn
+      legend_2->AddEntry(reflBkgFunc2DCurve, "Refl D^{0} - Bkg #bar{D^{0}}", "l");   // Entry for cross term refl x bkg
+      legend_2->AddEntry(reflReflFunc2DCurve, "Refl D^{0} - Refl #bar{D^{0}}", "l"); // Entry for cross term refl x refl
+    }
   }
 
   // Display chi2/ndf and parameter values
-  TPaveText *chi2Text = new TPaveText(0.12, 0.8, 0.4, 0.85, "brNDC");
+  TPaveText *chi2Text = new TPaveText(0.17, 0.6, 0.4, 0.67, "brNDC");
   chi2Text->SetTextFont(42);
   chi2Text->SetTextSize(0.04);
   chi2Text->SetBorderSize(0);
@@ -1669,33 +1841,99 @@ void InvMassFitter2D::plotProjectionsAfterFit(RooFitResult *fitResult, RooProdPd
   chi2Text->SetTextAlign(11);
 
   // Add text lines
-  if (strcmp(suffix, "") == 0) {
+  if (strcmp(suffix, "") == 0 && chi2_ndf != 0) {
     chi2Text->AddText(Form("#chi^{2}/ndf = %.3f", chi2_ndf));
   }
+
+  TPaveText *ptTitle = new TPaveText(0.17, 0.8, 0.45, 0.9, "brNDC");
+  ptTitle->SetTextFont(42);
+  ptTitle->SetTextSize(0.04);
+  ptTitle->SetBorderSize(0);
+  ptTitle->SetFillStyle(0);
+  ptTitle->SetTextAlign(11);
+
+    // Add text lines
+  ptTitle->AddText("#scale[1.35]{ALICE Work in Progress}");
+  ptTitle->AddText("#scale[1.2]{pp, #sqrt{#it{s}} = 13.6 TeV}");
+
+  TPaveText *pt = new TPaveText(0.17, 0.69, 0.5, 0.8, "brNDC");
+    pt->SetTextFont(42);
+    pt->SetTextSize(0.04);
+    pt->SetBorderSize(0);
+    pt->SetFillStyle(0);
+    pt->SetTextAlign(11);
+
+    // Add text lines
+    pt->AddText(Form("#scale[1.1]{%.1f < #it{p}_{T} < %.1f GeV/#it{c}}", _ptMin, _ptMax));
+    pt->AddText("#scale[1.1]{|#it{y}| < 0.5}");
+
+    TPaveText *pt_cand1 = new TPaveText(0.17, 0.75, 0.7, 0.9, "brNDC");
+    pt_cand1->SetTextFont(42);
+    pt_cand1->SetTextSize(0.04);
+    pt_cand1->SetBorderSize(0);
+    pt_cand1->SetFillStyle(0);
+    pt_cand1->SetTextAlign(11);
+
+    // Add text lines
+    pt_cand1->AddText("#scale[1.1]{D^{0} #rightarrow K^{#minus}#pi^{+} and charge conj.}");
+    if (strcmp(_pairType, "OS") == 0)
+    {
+      pt_cand1->AddText("#scale[1.1]{D^{0}#bar{D}^{0} + #bar{D}^{0}D^{0} pairs}");
+    }
+    else if (strcmp(_pairType, "LS") == 0)
+    {
+      pt_cand1->AddText("#scale[1.1]{D^{0}D^{0} + #bar{D}^{0}#bar{D}^{0} pairs}");
+    }
 
   // Create a canvas to draw the projections
   TCanvas *c_proj = new TCanvas(saveName, saveName, 1250, 600);
   c_proj->Divide(2, 1);     // Divide canvas into two pads
   gPad->SetLeftMargin(0.2); // Increase the left margin (default is ~0.1)
 
+
   // Draw the X projection
   c_proj->cd(1); // Go to the first pad
-  frameCand1->SetXTitle("M(K#pi) (GeV/#it{c}^{2})");
+  gPad->SetTicks(1, 1);  // Enable ticks
+  gPad->SetLeftMargin(0.15);   // Adjust left margin (e.g., 15%)
+  gPad->SetRightMargin(0.02);  // Adjust right margin
+  gPad->SetTopMargin(0.05);    // Adjust top margin
+  gPad->SetBottomMargin(0.15); // Adjust bottom margin
+
+  double maxY1 = frameCand1->GetMaximum();
+  frameCand1->SetMaximum(maxY1 + maxY1/4);
+
+  frameCand1->SetTitle("");
+  frameCand1->SetXTitle("#it{M}_{K#pi} (GeV/#it{c}^{2})");
   frameCand1->SetYTitle("Counts per 5 MeV/#it{c}^{2}");
   frameCand1->GetXaxis()->SetTitleSize(0.05); // Set X-axis title size
   frameCand1->GetYaxis()->SetTitleSize(0.05); // Set Y-axis title size
+
   frameCand1->Draw();
-  // Draw the legend on the canvas
+  ptTitle->Draw("same");
   legend->Draw();
+  
+  pt->Draw("same");
 
   // Draw the Y projection
   c_proj->cd(2); // Go to the second pad
+  gPad->SetTicks(1, 1);  // Enable ticks
+  gPad->SetLeftMargin(0.15);   // Adjust left margin (e.g., 15%)
+  gPad->SetRightMargin(0.02);  // Adjust right margin
+  gPad->SetTopMargin(0.05);    // Adjust top margin
+  gPad->SetBottomMargin(0.15); // Adjust bottom margin
+
+  frameCand2->SetTitle("");
   frameCand2->SetYTitle("Counts per 5 MeV/#it{c}^{2}");
-  frameCand2->SetXTitle("M(K#pi) (GeV/#it{c}^{2})");
+  frameCand2->SetXTitle("#it{M}_{K#pi} (GeV/#it{c}^{2})");
   frameCand2->GetXaxis()->SetTitleSize(0.05); // Set X-axis title size
   frameCand2->GetYaxis()->SetTitleSize(0.05); // Set Y-axis title size
+
+  double maxY2 = frameCand2->GetMaximum();
+  frameCand2->SetMaximum(maxY2 + maxY2/4);
+
   frameCand2->Draw();
   chi2Text->Draw("same");
+  pt_cand1->Draw("same");
 
   if (doReflections)
   {
@@ -1788,6 +2026,8 @@ void InvMassFitter2D::plotProjectionsAfterFit(RooFitResult *fitResult, RooProdPd
 
   delete c_ratio;
   delete cResiduals;
+  delete histoCand1;
+  delete histoCand2;
 
 }
 
@@ -1831,6 +2071,20 @@ double InvMassFitter2D::calculateWeights(double const &y, double const &pt)
   return weight;
 }
 
+// Create Lorentz vector to calculate the pt of the pair
+ROOT::Math::PxPyPzMVector InvMassFitter2D::createLorentzVector(double const &phi, double const &y, double const &pt, double const &m)
+{
+  // Calculate momentum components
+  double const px = pt * cos(phi);
+  double const py = pt * sin(phi);
+  double const pz = pt * sinh(y);
+
+  // Create the Lorentz vector
+  ROOT::Math::PxPyPzMVector lorentzVector(px, py, pz, m);
+
+  return lorentzVector;
+}
+
 RooRealVar *InvMassFitter2D::getYieldInRange(RooFitResult *fitResult, RooRealVar *massCand1, RooRealVar *massCand2, RooProdPdf function, RooFormulaVar nCands, TString range)
 {
   // Calculate the integrals over the specified range and the full range
@@ -1851,356 +2105,6 @@ RooRealVar *InvMassFitter2D::getYieldInRange(RooFitResult *fitResult, RooRealVar
   RooRealVar *yield = new RooRealVar("yield", "Yield in 3-sigma range", yieldRange);
   yield->setError(errorRange);
   return yield;
-}
-
-// Create Lorentz vector to calculate the pt of the pair
-ROOT::Math::PxPyPzMVector InvMassFitter2D::createLorentzVector(double const &phi, double const &y, double const &pt, double const &m)
-{
-  // Calculate momentum components
-  double const px = pt * cos(phi);
-  double const py = pt * sin(phi);
-  double const pz = pt * sinh(y);
-
-  // Create the Lorentz vector
-  ROOT::Math::PxPyPzMVector lorentzVector(px, py, pz, m);
-
-  return lorentzVector;
-}
-
-// Function to analyse and compare the pT and y distributions of my candidates
-// in a sideband region and the signal region after subtracting the background
-void InvMassFitter2D::analyseKinematicDistributions(TFile *fout, RooDataSet *dataset, const char *suffix)
-{
-  //RooDataSet *dataset = dynamic_cast<RooDataSet *>(_workspace.data("data"));
-  if (!dataset)
-    {
-        cerr << "ERROR: dataset not found!" << endl;
-        return;
-    }
-  // Get inv. mass, pt and y of the candidates
-  RooRealVar *massCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fMCand1"));
-  RooRealVar *massCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fMCand2"));
-  RooRealVar *ptCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPtCand1"));
-  RooRealVar *ptCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPtCand2"));
-  RooRealVar *yCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fYCand1"));
-  RooRealVar *yCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fYCand2"));
-  RooRealVar *phiCand1 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPhiCand1"));
-  RooRealVar *phiCand2 = dynamic_cast<RooRealVar *>(dataset->get()->find("fPhiCand2"));
-  RooRealVar *ptPair = dynamic_cast<RooRealVar *>(dataset->get()->find("fPtPair"));
-
-  massCand1->setRange(_massMin, _massMax);
-  massCand2->setRange(_massMin, _massMax);
-
-  // Create formula variables for deltaPt and deltaY
-  RooRealVar deltaPt("deltaPt", "ptCand1 - ptCand2", 0., -24.0, 24.0);
-  RooRealVar deltaY("deltaY", "yCand1 - yCand2", 0., -2.0, 2.0);
-  RooRealVar deltaPhi("deltaPhi", "phiCand1 - phiCand2", 0., -10.0, 10.0);
-
-  // Create a set of the variables for the new dataset
-  RooArgSet vars(*massCand1, *massCand2, *ptCand1, *ptCand2, *yCand1, *yCand2, *phiCand1, *phiCand2, *ptPair, deltaPt, deltaY, deltaPhi);
-
-  RooRealVar *mean = _workspace.var("mean");
-  RooRealVar *sigma = _workspace.var("sigma");
-  //RooRealVar *meanCand2 = _workspace.var("meanCand2");
-  //RooRealVar *sigmaCand2 = _workspace.var("sigmaCand2");
-
-  TH1F* hPtPair = new TH1F("hPtPair", Form("Pair Pt distribution_%s", suffix), 100, 0, 15);
-  TH2F* hPtPairVsDeltaPt = new TH2F(Form("ptPairVsDeltaPtHist_%s", suffix), "Pair Pt vs. delta Pt distribution", 75, 0, 15, 30, -10, 10);
-  TH2F* hPtPairVsDeltaY = new TH2F(Form("ptPairVsDeltaYHist_%s", suffix), "Pair Pt vs. delta Y distribution", 75, 0, 15, 30, -1.2, 1.2);
-  TH2F* hPtPairVsDeltaPhi = new TH2F(Form("ptPairVsDeltaPhiHist_%s", suffix), "Pair Pt vs. delta Phi distribution", 75, 0, 15, 28, -7., 7.);
-
-  TH2F* hPtPairVsDeltaPt_02 = new TH2F(Form("ptPairVsDeltaPtHist_0-2_%s", suffix), "Pair Pt vs. delta Pt distribution", 20, 0, 2, 25, -2., 2.);
-  TH2F* hPtPairVsDeltaY_02 = new TH2F(Form("ptPairVsDeltaYHist_0-2_%s", suffix), "Pair Pt vs. delta Y distribution", 20, 0, 2, 30, -1.2, 1.2);
-  TH2F* hPtPairVsDeltaPhi_02 = new TH2F(Form("ptPairVsDeltaPhiHist_0-2_%s", suffix), "Pair Pt vs. delta Phi distribution", 20, 0, 2, 28, -7., 7.);
-
-  TH2F* hPtPairVsAbsDeltaPt = new TH2F(Form("ptPairVsAbsDeltaPtHist_%s", suffix), "Pair Pt vs. |delta Pt| distribution", 75, 0, 15, 30, 0, 10);
-  TH2F* hPtPairVsAbsDeltaY = new TH2F(Form("ptPairVsAbsDeltaYHist_%s", suffix), "Pair Pt vs. |delta Y| distribution", 75, 0, 15, 30, 0., 1.2);
-  TH2F* hPtPairVsAbsDeltaPhi = new TH2F(Form("ptPairVsAbsDeltaPhiHist_%s", suffix), "Pair Pt vs. |delta Phi| distribution", 75, 0, 15, 28, 0., 7.);
-
-  TH2F* hPtPairVsAbsDeltaPt_02 = new TH2F(Form("ptPairVsAbsDeltaPtHist_0-2_%s", suffix), "Pair Pt vs. |delta Pt| distribution", 20, 0, 2, 25, 0, 2);
-  TH2F* hPtPairVsAbsDeltaY_02 = new TH2F(Form("ptPairVsAbsDeltaYHist_0-2_%s", suffix), "Pair Pt vs. |delta Y| distribution", 20, 0, 2, 30, 0, 1.2);
-  TH2F* hPtPairVsAbsDeltaPhi_02 = new TH2F(Form("ptPairVsAbsDeltaPhiHist_0-2_%s", suffix), "Pair Pt vs. |delta Phi| distribution", 20, 0, 2, 28, 0., 7.);
-
-  // Create dataset in sideband region
-  RooDataSet *datasetSidebandRegion = new RooDataSet("datasetSidebandRegion", "datasetSidebandRegion", vars);
-
-  cout << "bkgLeftCand1: [" << _massMin << ", " << mean->getVal() - 4 * sigma->getVal() << "]" << endl;
-  cout << "bkgRightCand1: [" << mean->getVal() + 4 * sigma->getVal() << ", " << _massMax << "]" << endl;
-
-  for (int i = 0; i < dataset->numEntries(); ++i)
-  {
-    const RooArgSet *row = dataset->get(i);
-    // Select sideband region
-    if ((massCand1->getVal() > (mean->getVal() - 4 * sigma->getVal()) && massCand1->getVal() < (mean->getVal() + 4 * sigma->getVal())) ||
-        (massCand2->getVal() > (mean->getVal() - 4 * sigma->getVal()) && massCand2->getVal() < (mean->getVal() + 4 * sigma->getVal()))) {
-      continue;
-    }
-
-    massCand1->setVal(row->getRealValue("fMCand1"));
-    massCand2->setVal(row->getRealValue("fMCand2"));
-    ptCand1->setVal(row->getRealValue("fPtCand1"));
-    ptCand2->setVal(row->getRealValue("fPtCand2"));
-    yCand1->setVal(row->getRealValue("fYCand1"));
-    yCand2->setVal(row->getRealValue("fYCand2"));
-    phiCand1->setVal(row->getRealValue("fPhiCand1"));
-    phiCand2->setVal(row->getRealValue("fPhiCand2"));
-    ptPair->setVal(row->getRealValue("fPtPair"));
-
-    // Calculate deltaPt and deltaY
-    double deltaPtValue = ptCand1->getVal() - ptCand2->getVal();
-    double deltaYValue = yCand1->getVal() - yCand2->getVal();
-    double deltaPhiValue = phiCand1->getVal() - phiCand2->getVal();
-
-    // Set the delta values manually in the new dataset
-    deltaPt.setVal(deltaPtValue);
-    deltaY.setVal(deltaYValue);
-    deltaPhi.setVal(deltaPhiValue);
-
-    datasetSidebandRegion->add(vars);
-  }
-
-  // Create dataset in signal region
-  // Manually fill the dataset with deltaPt and deltaY values
-  // TODO: remove background candidates from signal region
-
-  RooDataSet *datasetSignalRegion = new RooDataSet("datasetSignalRegion", "datasetSignalRegion", vars);
-  for (int i = 0; i < dataset->numEntries(); ++i)
-  {
-    const RooArgSet *row = dataset->get(i);
-    // Select signal region
-    if (massCand1->getVal() < (mean->getVal() - 3 * sigma->getVal()) || massCand1->getVal() > (mean->getVal() + 3 * sigma->getVal())) {
-      continue;
-    }
-    if (massCand2->getVal() < (mean->getVal() - 3 * sigma->getVal()) || massCand2->getVal() > (mean->getVal() + 3 * sigma->getVal())) {
-      continue;
-    }
-
-    massCand1->setVal(row->getRealValue("fMCand1"));
-    massCand2->setVal(row->getRealValue("fMCand2"));
-    ptCand1->setVal(row->getRealValue("fPtCand1"));
-    ptCand2->setVal(row->getRealValue("fPtCand2"));
-    yCand1->setVal(row->getRealValue("fYCand1"));
-    yCand2->setVal(row->getRealValue("fYCand2"));
-    phiCand1->setVal(row->getRealValue("fPhiCand1"));
-    phiCand2->setVal(row->getRealValue("fPhiCand2"));
-    ptPair->setVal(row->getRealValue("fPtPair"));
-
-    // Calculate deltaPt, deltaPhi, and deltaY
-    double deltaPtValue = ptCand1->getVal() - ptCand2->getVal();
-    double deltaYValue = yCand1->getVal() - yCand2->getVal();
-    double deltaPhiValue = phiCand1->getVal() - phiCand2->getVal();
-
-    // Set the delta values manually in the new dataset
-    deltaPt.setVal(deltaPtValue);
-    deltaY.setVal(deltaYValue);
-    deltaPhi.setVal(deltaPhiValue);
-
-    datasetSignalRegion->add(vars);
-
-    hPtPair->Fill(ptPair->getVal());  // Fill histogram for each pair
-    hPtPairVsDeltaPt->Fill(ptPair->getVal(), deltaPtValue);
-    hPtPairVsDeltaY->Fill(ptPair->getVal(), deltaYValue);
-    hPtPairVsDeltaPhi->Fill(ptPair->getVal(), deltaPhiValue);
-
-    hPtPairVsAbsDeltaPt->Fill(ptPair->getVal(), abs(deltaPtValue));
-    hPtPairVsAbsDeltaY->Fill(ptPair->getVal(), abs(deltaYValue));
-    hPtPairVsAbsDeltaPhi->Fill(ptPair->getVal(), abs(deltaPhiValue));
-
-    if (ptPair->getVal() <= 2) {
-      hPtPairVsDeltaPt_02->Fill(ptPair->getVal(), deltaPtValue);
-      hPtPairVsDeltaY_02->Fill(ptPair->getVal(), deltaYValue);
-      hPtPairVsDeltaPhi_02->Fill(ptPair->getVal(), deltaPhiValue);
-
-      hPtPairVsAbsDeltaPt_02->Fill(ptPair->getVal(), abs(deltaPtValue));
-      hPtPairVsAbsDeltaY_02->Fill(ptPair->getVal(), abs(deltaYValue));
-      hPtPairVsAbsDeltaPhi_02->Fill(ptPair->getVal(), abs(deltaPhiValue));
-    }
-  }
-
-  double binWidth = 1.; // Desired bin width
-  int nBins = (int)((_ptMax - _ptMin) / binWidth);
-
-  /// --------------------------------------------------------
-  /// ------------------ PT DISTRIBUTIONS --------------------
-  /// --------------------------------------------------------
-
-  float const nSideband = datasetSidebandRegion->sumEntries();
-  float const nSignal = datasetSignalRegion->sumEntries();
-
-  // Create histos with pt distributions
-  TH1F* histSidebandPtCand1 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPtCand1_%s", suffix), *ptCand1, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSignalPtCand1 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPtCand1_%s", suffix), *ptCand1, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSidebandPtCand2 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPtCand2_%s", suffix), *ptCand2, Binning(nBins, _ptMin, _ptMax));
-  TH1F* histSignalPtCand2 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPtCand2_%s", suffix), *ptCand2, Binning(nBins, _ptMin, _ptMax));
-
-  plotKinematicDistributions(histSidebandPtCand1, histSignalPtCand1, histSidebandPtCand2, histSignalPtCand2,
-                             nSideband, nSignal, "#it{p}_{T} (GeV/#it{c})", Form("ptDistributions_%s", suffix), fout);
-
-  /// --------------------------------------------------------
-  /// ------------------- Y DISTRIBUTIONS --------------------
-  /// --------------------------------------------------------
-
-  // Create histos with y distributions
-  TH1F* histSidebandYCand1 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandYCand1_%s", suffix), *yCand1, Binning(20, -0.6, 0.6));
-  TH1F* histSignalYCand1 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalYCand1_%s", suffix), *yCand1, Binning(20, -0.6, 0.6));
-  TH1F* histSidebandYCand2 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandYCand2_%s", suffix), *yCand2, Binning(20, -0.6, 0.6));
-  TH1F* histSignalYCand2 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalYCand2_%s", suffix), *yCand2, Binning(20, -0.6, 0.6));
-
-  plotKinematicDistributions(histSidebandYCand1, histSignalYCand1, histSidebandYCand2, histSignalYCand2,
-                             nSideband, nSignal, "#it{y}", Form("yDistributions_%s", suffix), fout);
-
-  /// --------------------------------------------------------
-  /// ----------------- PHI DISTRIBUTIONS --------------------
-  /// --------------------------------------------------------
-
-  // Create histos with phi distributions
-  TH1F* histSidebandPhiCand1 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPhiCand1_%s", suffix), *phiCand1, Binning(nBins, 0, 6.5));
-  TH1F* histSignalPhiCand1 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPhiCand1_%s", suffix), *phiCand1, Binning(nBins, 0, 6.5));
-  TH1F* histSidebandPhiCand2 = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandPhiCand2_%s", suffix), *phiCand2, Binning(nBins, 0, 6.5));
-  TH1F* histSignalPhiCand2 = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalPhiCand2_%s", suffix), *phiCand2, Binning(nBins, 0, 6.5));
-
-  plotKinematicDistributions(histSidebandPhiCand1, histSignalPhiCand1, histSidebandPhiCand2, histSignalPhiCand2,
-                             nSideband, nSignal, "#phi", Form("phiDistributions_%s", suffix), fout);
-
-  /// --------------------------------------------------------------
-  /// ------------------ DELTA Y, PT DISTRIBUTIONS --------------------
-  /// --------------------------------------------------------------
-
-  //gROOT->SetBatch(kTRUE);
-
-  // Create histos with pt distributions
-  TH1F* histSidebandDeltaPt = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandDeltaPt_%s", suffix), deltaPt, Binning(40, -_ptMax, _ptMax));
-  TH1F* histSidebandDeltaY = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandDeltaY_%s", suffix), deltaY, Binning(40, -1.0, 1.0));
-  TH1F* histSignalDeltaPt = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalDeltaPt_%s", suffix), deltaPt, Binning(40, -_ptMax, _ptMax));
-  TH1F* histSignalDeltaY = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalDeltaY_%s", suffix), deltaY, Binning(40, -1.0, 1.0));
-  TH1F* histSidebandDeltaPhi = (TH1F*)datasetSidebandRegion->createHistogram(Form("histSidebandDeltaPhi_%s", suffix), deltaPhi, Binning(40, -6.5, 6.5));
-  TH1F* histSignalDeltaPhi = (TH1F*)datasetSignalRegion->createHistogram(Form("histSignalDeltaPhi_%s", suffix), deltaPhi, Binning(40, -6.5, 6.5));
-
-  plotDeltaKinematicDistributions(histSidebandDeltaPt, histSignalDeltaPt, histSidebandDeltaY, histSignalDeltaY,
-                                  histSignalDeltaPhi, histSidebandDeltaPhi, nSideband, nSignal, Form("deltaDistributions_%s", suffix), fout);
-
-  TCanvas *cPtPair = new TCanvas(Form("cPtPair_%s", suffix), Form("cPtPair_%s", suffix), 800, 600);
-  hPtPair->SetTitle(Form("#it{p}_{T} of the D-meson pair"));
-  hPtPair->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD} (GeV/#it{c})"));
-  hPtPair->GetYaxis()->SetTitle(Form("Entries"));
-  hPtPair->Draw();
-  cPtPair->SaveAs(Form("ptPairHist_%s.png", suffix));
-
-  TCanvas *cPtPairVsDeltaPt = new TCanvas(Form("cPtPairVsDeltaPt_%s", suffix), Form("cPtPairVsDeltaPt_%s", suffix), 800, 600);
-  hPtPairVsDeltaPt->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaPt->GetYaxis()->SetTitle(Form("#Delta#it{p}_{T} (GeV/#it{c})"));
-  hPtPairVsDeltaPt->Draw("colz");
-  cPtPairVsDeltaPt->SaveAs(Form("ptPairVsDeltaPtHist_%s.png", suffix));
-
-  TCanvas *cPtPairVsDeltaPhi = new TCanvas(Form("cPtPairVsDeltaPhi_%s", suffix), Form("cPtPairVsDeltaPhi_%s", suffix), 800, 600);
-  hPtPairVsDeltaPhi->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaPhi->GetYaxis()->SetTitle(Form("#Delta#phi"));
-  hPtPairVsDeltaPhi->Draw("colz");
-  cPtPairVsDeltaPhi->SaveAs(Form("ptPairVsDeltaPhiHist_%s.png", suffix));
-
-  TCanvas *cPtPairVsDeltaY = new TCanvas(Form("cPtPairVsDeltaY_%s", suffix), Form("cPtPairVsDeltaY_%s", suffix), 800, 600);
-  hPtPairVsDeltaY->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaY->GetYaxis()->SetTitle(Form("#Delta#it{y}"));
-  hPtPairVsDeltaY->Draw("colz");
-  cPtPairVsDeltaY->SaveAs(Form("ptPairVsDeltaYHist_%s.png", suffix));
-
-  TCanvas *cPtPairVsAbsDeltaPt = new TCanvas(Form("cPtPairVsAbsDeltaPt_%s", suffix), Form("cPtPairVsAbsDeltaPt_%s", suffix), 800, 600);
-  hPtPairVsAbsDeltaPt->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsAbsDeltaPt->GetYaxis()->SetTitle(Form("|#Delta#it{p}_{T}| (GeV/#it{c})"));
-  hPtPairVsAbsDeltaPt->Draw("colz");
-  cPtPairVsAbsDeltaPt->SaveAs(Form("ptPairVsAbsDeltaPtHist_%s.png", suffix));
-
-  TCanvas *cPtPairVsAbsDeltaPhi = new TCanvas(Form("cPtPairVsAbsDeltaPhi_%s", suffix), Form("cPtPairVsAbsDeltaPhi_%s", suffix), 800, 600);
-  hPtPairVsAbsDeltaPhi->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsAbsDeltaPhi->GetYaxis()->SetTitle(Form("|#Delta#phi|"));
-  hPtPairVsAbsDeltaPhi->Draw("colz");
-  cPtPairVsAbsDeltaPhi->SaveAs(Form("ptPairVsAbsDeltaPhiHist_%s.png", suffix));
-
-  TCanvas *cPtPairVsAbsDeltaY = new TCanvas(Form("cPtPairVsAbsDeltaY_%s", suffix), Form("cPtPairVsAbsDeltaY_%s", suffix), 800, 600);
-  hPtPairVsAbsDeltaY->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsAbsDeltaY->GetYaxis()->SetTitle(Form("|#Delta#it{y}|"));
-  hPtPairVsAbsDeltaY->Draw("colz");
-  cPtPairVsAbsDeltaY->SaveAs(Form("ptPairVsAbsDeltaYHist_%s.png", suffix));
-
-  TCanvas *cPtPairVsDeltaPt_02 = new TCanvas(Form("cPtPairVsDeltaPt_02_%s", suffix), Form("cPtPairVsDeltaPt_02_%s", suffix), 800, 600);
-  hPtPairVsDeltaPt_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaPt_02->GetYaxis()->SetTitle(Form("#Delta#it{p}_{T} (GeV/#it{c})"));
-  hPtPairVsDeltaPt_02->Draw("colz");
-  cPtPairVsDeltaPt_02->SaveAs(Form("ptPairVsDeltaPtHist_02_%s.png", suffix));
-
-  TCanvas *cPtPairVsDeltaPhi_02 = new TCanvas(Form("cPtPairVsDeltaPhi_02_%s", suffix), Form("cPtPairVsDeltaPhi_02_%s", suffix), 800, 600);
-  hPtPairVsDeltaPhi_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaPhi_02->GetYaxis()->SetTitle(Form("#Delta#phi"));
-  hPtPairVsDeltaPhi_02->Draw("colz");
-  cPtPairVsDeltaPhi_02->SaveAs(Form("ptPairVsDeltaPhiHist_02_%s.png", suffix));
-
-  TCanvas *cPtPairVsDeltaY_02 = new TCanvas(Form("cPtPairVsDeltaY_02_%s", suffix), Form("cPtPairVsDeltaY_02_%s", suffix), 800, 600);
-  hPtPairVsDeltaY_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsDeltaY_02->GetYaxis()->SetTitle(Form("#Delta#it{y}"));
-  hPtPairVsDeltaY_02->Draw("colz");
-  cPtPairVsDeltaY_02->SaveAs(Form("ptPairVsDeltaYHist_02_%s.png", suffix));
-
-  TCanvas *cPtPairVsAbsDeltaPt_02 = new TCanvas(Form("cPtPairVsAbsDeltaPt_02_%s", suffix), Form("cPtPairVsAbsDeltaPt_02_%s", suffix), 800, 600);
-  hPtPairVsAbsDeltaPt_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsAbsDeltaPt_02->GetYaxis()->SetTitle(Form("#Delta#it{p}_{T} (GeV/#it{c})"));
-  hPtPairVsAbsDeltaPt_02->Draw("colz");
-  cPtPairVsAbsDeltaPt_02->SaveAs(Form("ptPairVsAbsDeltaPtHist_02_%s.png", suffix));
-
-  TCanvas *cPtPairVsAbsDeltaPhi_02 = new TCanvas(Form("cPtPairVsAbsDeltaPhi_02_%s", suffix), Form("cPtPairVsAbsDeltaPhi_02_%s", suffix), 800, 600);
-  hPtPairVsAbsDeltaPhi_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsAbsDeltaPhi_02->GetYaxis()->SetTitle(Form("|#Delta#phi|"));
-  hPtPairVsAbsDeltaPhi_02->Draw("colz");
-  cPtPairVsAbsDeltaPhi_02->SaveAs(Form("ptPairVsAbsDeltaPhiHist_02_%s.png", suffix));
-
-  TCanvas *cPtPairVsAbsDeltaY_02 = new TCanvas(Form("cPtPairVsAbsDeltaY_02_%s", suffix), Form("cPtPairVsAbsDeltaY_02_%s", suffix), 800, 600);
-  hPtPairVsAbsDeltaY_02->GetXaxis()->SetTitle(Form("#it{p}_{T}^{DD}(GeV/#it{c})"));
-  hPtPairVsAbsDeltaY_02->GetYaxis()->SetTitle(Form("|#Delta#it{y}|"));
-  hPtPairVsAbsDeltaY_02->Draw("colz");
-  cPtPairVsAbsDeltaY_02->SaveAs(Form("ptPairVsAbsDeltaYHist_02_%s.png", suffix));
-
-  fout->cd();
-  cPtPair->Write();
-  cPtPairVsDeltaPt->Write();
-  cPtPairVsDeltaY->Write();
-  cPtPairVsDeltaPhi->Write();
-
-  hPtPairVsDeltaPt->Write();
-  hPtPairVsDeltaY->Write();
-  hPtPairVsDeltaPhi->Write();
-
-  hPtPairVsAbsDeltaPt->Write();
-  hPtPairVsAbsDeltaY->Write();
-  hPtPairVsAbsDeltaPhi->Write();
-
-  hPtPairVsDeltaPt_02->Write();
-  hPtPairVsDeltaY_02->Write();
-  hPtPairVsDeltaPhi_02->Write();
-
-  hPtPairVsAbsDeltaPt_02->Write();
-  hPtPairVsAbsDeltaY_02->Write();
-  hPtPairVsAbsDeltaPhi_02->Write();
-
-  delete cPtPair;
-  delete cPtPairVsDeltaPt;
-  delete cPtPairVsDeltaY;
-  delete cPtPairVsDeltaPhi;
-
-  delete hPtPairVsDeltaPt;
-  delete hPtPairVsDeltaY;
-  delete hPtPairVsDeltaPhi;
-
-  delete hPtPairVsAbsDeltaPt;
-  delete hPtPairVsAbsDeltaY;
-  delete hPtPairVsAbsDeltaPhi;
-
-  delete hPtPairVsDeltaPt_02;
-  delete hPtPairVsDeltaY_02;
-  delete hPtPairVsDeltaPhi_02;
-
-  delete hPtPairVsAbsDeltaPt_02;
-  delete hPtPairVsAbsDeltaY_02;
-  delete hPtPairVsAbsDeltaPhi_02;
-
 }
 
 void InvMassFitter2D::plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult,
@@ -2268,142 +2172,73 @@ void InvMassFitter2D::plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooA
   delete canvas;
 }
 
-void InvMassFitter2D::setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, int const& candNum, TString physVar) {
-  hSideband->SetLineColor(kRed);
-  hSideband->SetMarkerColor(kRed);
-  hSideband->SetMarkerStyle(21);
+void InvMassFitter2D::plotFitResults(RooDataSet* dataset, RooRealVar* mass, RooAbsPdf* model, RooFitResult* fitResult,
+                                     const char* sgnComponent, const char* bkgComponent, const char* reflComponent, const char* title, const char* canvasName) {
+  // Create a RooPlot for the mass variable
+  RooPlot* frame = mass->frame(Title(title));
 
-  hSignal->SetLineColor(kBlue);
-  hSignal->SetMarkerColor(kBlue);
-  hSignal->SetMarkerStyle(22);
+  // Get chi^2/ndf
+  // Only works with binned data!!!
+  // Convert unbinned dataset into binned dataset
+  RooDataHist rooDsBinned("rooDsBinned", "Binned version of dataset", RooArgSet(*mass), *dataset);
+  // Compute chi^2
+  RooAbsReal* chi2 = model->createChi2(rooDsBinned, RooFit::DataError(RooAbsData::SumW2), RooFit::Extended(true));
 
-  hSideband->GetYaxis()->SetRangeUser(0, 0.5);
-  hSignal->GetYaxis()->SetRangeUser(0, 0.5);
+  int nPar = fitResult->floatParsFinal().getSize(); // get the number of free parameters
+  // Compute number of bins
+  int nBins = rooDsBinned.numEntries();
+  int ndof = nBins - nPar;
+  
+  double chi2_ndf = chi2->getVal() / ndof;
+  cout << chi2_ndf << endl;
 
-  TString title = Form("%s of candidate %d", physVar.Data(), candNum);
+  // Plot the data on the frame
+  dataset->plotOn(frame, Name("data"));
 
-  hSideband->SetTitle(title); // Set the plot title
-  hSideband->GetXaxis()->SetTitle(physVar);   // Set the x-axis label
-  hSideband->GetYaxis()->SetTitle("Normalised counts");   // Set the y-axis label
+  // Plot the components of the model (signal and background)
+  model->plotOn(frame, Components(sgnComponent), LineStyle(kDashed), LineColor(kGreen), Name("signal"));
+  model->plotOn(frame, Components(bkgComponent), LineStyle(kDashed), LineColor(kRed), Name("background"));
+  model->plotOn(frame, Components(reflComponent), LineStyle(kDashed), LineColor(kPink), Name("reflections"));
 
-  hSignal->SetTitle(title); // Set the plot title
-  hSignal->GetXaxis()->SetTitle(physVar);   // Set the x-axis label
-  hSignal->GetYaxis()->SetTitle("Normalised counts");   // Set the y-axis label
-}
+  // Plot the fitted model on the frame
+  model->plotOn(frame, Name("model"), LineColor(kBlue));
 
-void InvMassFitter2D::setHistoSignalSidebandStyle(TH1F *hSideband, TH1F *hSignal, TString physVar) {
-  hSideband->SetLineColor(kRed);
-  hSideband->SetMarkerColor(kRed);
-  hSideband->SetMarkerStyle(21);
+  // Customize the plot
+  frame->SetTitle(title);
+  frame->GetXaxis()->SetTitle("Mass");
+  frame->GetYaxis()->SetTitle("Events");
 
-  hSignal->SetLineColor(kBlue);
-  hSignal->SetMarkerColor(kBlue);
-  hSignal->SetMarkerStyle(22);
+  // Create a legend
+  TLegend* legend = new TLegend(0.6, 0.7, 0.9, 0.9);
+  legend->AddEntry(frame->findObject("data"), "Data", "lep");
+  legend->AddEntry(frame->findObject("model"), "Fit Model", "l");
+  legend->AddEntry(frame->findObject("signal"), "Signal Component", "l");
+  legend->AddEntry(frame->findObject("background"), "Background Component", "l");
+  legend->AddEntry(frame->findObject("reflections"), "Reflected Component", "l");
 
-  hSideband->GetYaxis()->SetRangeUser(0, 0.2);
-  hSignal->GetYaxis()->SetRangeUser(0, 0.2);
+  // Display chi2/ndf and parameter values
+  TPaveText *chi2Text = new TPaveText(0.12, 0.8, 0.4, 0.85, "brNDC");
+  chi2Text->SetTextFont(42);
+  chi2Text->SetTextSize(0.04);
+  chi2Text->SetBorderSize(0);
+  chi2Text->SetFillStyle(0);
+  chi2Text->SetTextAlign(11);
 
-  TString title = Form("%s", physVar.Data());
+  // Add text lines
+  chi2Text->AddText(Form("#chi^{2}/ndf = %.3f", chi2_ndf));
 
-  hSideband->SetTitle(title); // Set the plot title
-  hSideband->GetXaxis()->SetTitle(physVar);   // Set the x-axis label
-  hSideband->GetYaxis()->SetTitle("Normalised counts");   // Set the y-axis label
-
-  hSignal->SetTitle(title); // Set the plot title
-  hSignal->GetXaxis()->SetTitle(physVar);   // Set the x-axis label
-  hSignal->GetYaxis()->SetTitle("Normalised counts");   // Set the y-axis label
-}
-
-void InvMassFitter2D::plotKinematicDistributions(TH1F* histSidebandCand1, TH1F* histSignalCand1, TH1F* histSidebandCand2, TH1F* histSignalCand2,
-                                                float const nSideband, float const nSignal, TString const varName, TString canvasName, TFile *fout) {
-  //gROOT->SetBatch(kTRUE);
-
-  // Normalise
-  histSidebandCand1->Scale(1.0 / nSideband);
-  histSignalCand1->Scale(1.0 / nSignal);
-  histSidebandCand2->Scale(1.0 / nSideband);
-  histSignalCand2->Scale(1.0 / nSignal);
-
-  setHistoSignalSidebandStyle(histSidebandCand1, histSignalCand1, 1, varName);
-  setHistoSignalSidebandStyle(histSidebandCand2, histSignalCand2, 2, varName);
-
-  TLegend *legend = new TLegend(0.3, 0.3, 0.7, 0.3);
-  legend->AddEntry(histSidebandCand1, "Sideband Region", "pl");
-  legend->AddEntry(histSignalCand1, "Signal Region (not subtracted)", "pl");
-
-  TCanvas* canvas = new TCanvas(canvasName, canvasName, 1400, 650);
-  canvas->Divide(2, 1); // Divide the canvas into 2 columns and 1 row
-  canvas->cd(1); // Select the first pad
-  histSidebandCand1->Draw("PE");
-  histSignalCand1->Draw("samePE");
+  // Draw the plot on a TCanvas
+  TCanvas* canvas = new TCanvas(canvasName, title, 800, 600);
+  frame->Draw();
+  chi2Text->Draw("same");
   legend->Draw();
-  canvas->cd(2); // Select the second pad
-  histSidebandCand2->Draw("PE");
-  histSignalCand2->Draw("samePE");
+  canvas->Update();
 
-  TString saveName = canvasName + ".png";
-
-  canvas->SaveAs(saveName);
-  fout->cd();
-  canvas->Write();
-  histSidebandCand1->Write();
-  histSidebandCand2->Write();
-  histSignalCand1->Write();
-  histSignalCand2->Write();
-  canvas->Close();
-
+  // Optionally, save the plot to a file
+  canvas->SaveAs(Form("%s.png", canvasName));
+  delete canvas;
 }
 
-void InvMassFitter2D::plotDeltaKinematicDistributions(TH1F* histSidebandDeltaPt, TH1F* histSignalDeltaPt, TH1F* histSidebandDeltaY,
-                                                      TH1F* histSignalDeltaY, TH1F* histSignalDeltaPhi, TH1F* histSidebandDeltaPhi,
-                                                      float const nSideband, float const nSignal, TString canvasName, TFile *fout) {
-  //gROOT->SetBatch(kTRUE);
-
-  // Normalise
-  histSidebandDeltaPt->Scale(1.0 / nSideband);
-  histSignalDeltaPt->Scale(1.0 / nSignal);
-  histSidebandDeltaY->Scale(1.0 / nSideband);
-  histSignalDeltaY->Scale(1.0 / nSignal);
-  histSidebandDeltaPhi->Scale(1.0 / nSideband);
-  histSignalDeltaPhi->Scale(1.0 / nSignal);
-
-  setHistoSignalSidebandStyle(histSidebandDeltaPt, histSignalDeltaPt, "#Delta#it{p}_{T} (GeV/#it{c})");
-  setHistoSignalSidebandStyle(histSidebandDeltaY, histSignalDeltaY, "#Delta#it{y}");
-  setHistoSignalSidebandStyle(histSidebandDeltaPhi, histSignalDeltaPhi, "#Delta#phi");
-  histSidebandDeltaPt->GetYaxis()->SetRangeUser(0, 0.4);
-  histSignalDeltaPt->GetYaxis()->SetRangeUser(0, 0.4);
-  histSidebandDeltaY->GetYaxis()->SetRangeUser(0, 0.1);
-  histSignalDeltaY->GetYaxis()->SetRangeUser(0, 0.1);
-  histSidebandDeltaPhi->GetYaxis()->SetRangeUser(0, 0.15);
-  histSignalDeltaPhi->GetYaxis()->SetRangeUser(0, 0.15);
-
-  TLegend *legend = new TLegend(0.3, 0.7, 0.7, 0.85);
-  legend->AddEntry(histSidebandDeltaPt, "Sideband Region", "pl");
-  legend->AddEntry(histSignalDeltaPt, "Signal Region (not subtracted)", "pl");
-
-  TCanvas *canvas = new TCanvas("canvasDelta", "canvasDelta", 1700, 650);
-  canvas->Divide(3, 1); // Divide the canvas into 2 columns and 1 row
-  canvas->cd(1);        // Select the first pad
-  histSidebandDeltaPt->Draw("PE");
-  histSignalDeltaPt->Draw("samePE");
-  canvas->cd(2); // Select the second pad
-  histSidebandDeltaY->Draw("PE");
-  histSignalDeltaY->Draw("samePE");
-  legend->Draw();
-  canvas->cd(3); // Select the second pad
-  histSidebandDeltaPhi->Draw("PE");
-  histSignalDeltaPhi->Draw("samePE");
-
-  TString saveName = canvasName + ".png";
-
-  canvas->SaveAs(saveName);
-  fout->cd();
-  canvas->Write();
-  histSidebandDeltaPt->Write();
-  histSidebandDeltaY->Write();
-  histSidebandDeltaPhi->Write();
-  canvas->Close();
-}
 
 void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgnPdfCand2,RooAbsPdf* &bkgPdfCand1,
                                          RooAbsPdf* &bkgPdfCand2, RooAbsPdf* &reflPdfCand1, RooAbsPdf* &reflPdfCand2, int8_t fitType) {
@@ -2420,6 +2255,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       sgnPdfCand1 = _workspace.pdf("sgnFuncGausCand1Corr");
       sgnPdfCand2 = _workspace.pdf("sgnFuncGausCand2Corr");
+    } else if (fitType == PrefitCorr) {
+      sgnPdfCand1 = _workspace.pdf("sgnFuncGausCand1CorrPrefit");
+      sgnPdfCand2 = _workspace.pdf("sgnFuncGausCand2CorrPrefit");
     }
   }
   else if (_sgnFuncOption == "CB")
@@ -2434,6 +2272,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       sgnPdfCand1 = _workspace.pdf("sgnFuncCBCand1Corr");
       sgnPdfCand2 = _workspace.pdf("sgnFuncCBCand2Corr");
+    } else if (fitType == PrefitCorr) {
+      sgnPdfCand1 = _workspace.pdf("sgnFuncCBCand1CorrPrefit");
+      sgnPdfCand2 = _workspace.pdf("sgnFuncCBCand2CorrPrefit");
     }
   } else {
     cerr << "ERROR: signal function not supported! \n Available options: gaus, CB. \n Exit!" << endl;
@@ -2459,6 +2300,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       bkgPdfCand1 = _workspace.pdf("bkgFuncExpoCand1Corr");
       bkgPdfCand2 = _workspace.pdf("bkgFuncExpoCand2Corr");
+    } else if (fitType == PrefitCorr) {
+      bkgPdfCand1 = _workspace.pdf("bkgFuncExpoCand1CorrPrefit");
+      bkgPdfCand2 = _workspace.pdf("bkgFuncExpoCand2CorrPrefit");
     }
   }
   else if (_bkgFuncOption == "poly0")
@@ -2473,6 +2317,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       bkgPdfCand1 = _workspace.pdf("bkgFuncPoly0Cand1Corr");
       bkgPdfCand2 = _workspace.pdf("bkgFuncPoly0Cand2Corr");
+    } else if (fitType == PrefitCorr) {
+      bkgPdfCand1 = _workspace.pdf("bkgFuncPoly0Cand1CorrPrefit");
+      bkgPdfCand2 = _workspace.pdf("bkgFuncPoly0Cand2CorrPrefit");
     }
   }
   else if (_bkgFuncOption == "poly1")
@@ -2487,6 +2334,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       bkgPdfCand1 = _workspace.pdf("bkgFuncPoly1Cand1Corr");
       bkgPdfCand2 = _workspace.pdf("bkgFuncPoly1Cand2Corr");
+    } else if (fitType == PrefitCorr) {
+      bkgPdfCand1 = _workspace.pdf("bkgFuncPoly1Cand1CorrPrefit");
+      bkgPdfCand2 = _workspace.pdf("bkgFuncPoly1Cand2CorrPrefit");
     }
   }
   else if (_bkgFuncOption == "poly2")
@@ -2501,6 +2351,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       bkgPdfCand1 = _workspace.pdf("bkgFuncPoly2Cand1Corr");
       bkgPdfCand2 = _workspace.pdf("bkgFuncPoly2Cand2Corr");
+    } else if (fitType == PrefitCorr) {
+      bkgPdfCand1 = _workspace.pdf("bkgFuncPoly2Cand1CorrPrefit");
+      bkgPdfCand2 = _workspace.pdf("bkgFuncPoly2Cand2CorrPrefit");
     }
   }
   else if (_bkgFuncOption == "expPoly2") {
@@ -2514,6 +2367,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       bkgPdfCand1 = _workspace.pdf("bkgFuncExpPoly2Cand1Corr");
       bkgPdfCand2 = _workspace.pdf("bkgFuncExpPoly2Cand2Corr");
+    } else if (fitType == PrefitCorr) {
+      bkgPdfCand1 = _workspace.pdf("bkgFuncExpPoly2Cand1CorrPrefit");
+      bkgPdfCand2 = _workspace.pdf("bkgFuncExpPoly2Cand2CorrPrefit");
     }
   }
   else if (_bkgFuncOption == "expPoly1") {
@@ -2527,6 +2383,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       bkgPdfCand1 = _workspace.pdf("bkgFuncExpPoly1Cand1Corr");
       bkgPdfCand2 = _workspace.pdf("bkgFuncExpPoly1Cand2Corr");
+    } else if (fitType == PrefitCorr) {
+      bkgPdfCand1 = _workspace.pdf("bkgFuncExpPoly1Cand1CorrPrefit");
+      bkgPdfCand2 = _workspace.pdf("bkgFuncExpPoly1Cand2CorrPrefit");
     }
   }
   else if (_bkgFuncOption == "exp2") {
@@ -2540,6 +2399,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       bkgPdfCand1 = _workspace.pdf("bkgFuncExp2Cand1Corr");
       bkgPdfCand2 = _workspace.pdf("bkgFuncExp2Cand2Corr");
+    } else if (fitType == PrefitCorr) {
+      bkgPdfCand1 = _workspace.pdf("bkgFuncExp2Cand1CorrPrefit");
+      bkgPdfCand2 = _workspace.pdf("bkgFuncExp2Cand2CorrPrefit");
     }
   }
 
@@ -2568,6 +2430,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       reflPdfCand1 = _workspace.pdf("reflFuncGausCand1Corr");
       reflPdfCand2 = _workspace.pdf("reflFuncGausCand2Corr");
+    } else if (fitType == PrefitCorr) {
+      reflPdfCand1 = _workspace.pdf("reflFuncGausCand1CorrPrefit");
+      reflPdfCand2 = _workspace.pdf("reflFuncGausCand2CorrPrefit");
     }
   }
   else if (_reflFuncOption == "doubleGaus")
@@ -2582,6 +2447,9 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
     } else if (fitType == Corrfit) {
       reflPdfCand1 = _workspace.pdf("reflFuncDoubleGausCand1Corr");
       reflPdfCand2 = _workspace.pdf("reflFuncDoubleGausCand2Corr");
+    } else if (fitType == PrefitCorr) {
+      reflPdfCand1 = _workspace.pdf("reflFuncDoubleGausCand1CorrPrefit");
+      reflPdfCand2 = _workspace.pdf("reflFuncDoubleGausCand2CorrPrefit");
     }
   }
   else
@@ -2600,20 +2468,39 @@ void InvMassFitter2D::selectFitFunctions(RooAbsPdf* &sgnPdfCand1,RooAbsPdf* &sgn
 RooFitResult *InvMassFitter2D::fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooRealVar& massVar, RooDataSet* dataset,
                                             const std::string& candidateName, const std::string& plotFilename) {
   // Define the number of signal and background events
+
   RooRealVar nSgn(Form("nSgn%s", candidateName.c_str()),
   Form("Number of signal events of %s", candidateName.c_str()),
-        100000, 0, 100000000);
+        100000, 0, 1e8);
   RooRealVar nBkg(Form("nBkg%s", candidateName.c_str()),
   Form("Number of background events of %s", candidateName.c_str()),
-    500000, 0, 200000000);
+    500000, 0, 1e8);
+
+  RooRealVar nSgnCorr(Form("nSgnCorr%s", candidateName.c_str()),
+    Form("Number of signal events of %s", candidateName.c_str()),
+        1e8, 0, 1e12);
+  RooRealVar nBkgCorr(Form("nBkgCorr%s", candidateName.c_str()),
+    Form("Number of background events of %s", candidateName.c_str()),
+        1e8, 0, 1e12);
 
   // Create the composite model
   RooAddPdf model(Form("model%s", candidateName.c_str()),
   Form("Signal + Background of %s", candidateName.c_str()),
     RooArgList(*sgnPdf, *bkgPdf), RooArgList(nSgn, nBkg));
+  
+  RooAddPdf modelCorr(Form("modelCorr%s", candidateName.c_str()),
+  Form("Signal + Background of %s", candidateName.c_str()),
+    RooArgList(*sgnPdf, *bkgPdf), RooArgList(nSgnCorr, nBkgCorr));
 
   // Fit the model to the data
-  RooFitResult* fitResult = model.fitTo(*dataset, Save(), RooFit::PrintLevel(-1));
+  RooFitResult* fitResult;
+  if (plotFilename.find("Corr") != std::string::npos) {
+    // The string contains "Corr"
+    fitResult =  modelCorr.fitTo(*dataset, Save(), RooFit::PrintLevel(-1));
+  } else {
+    fitResult =  model.fitTo(*dataset, Save(), RooFit::PrintLevel(-1));
+  }
+
   fitResult->Print("v");
   if (fitResult->status() != 0) {
     std::cout << "Fit did not converge for " << candidateName << "!" << std::endl;
@@ -2624,7 +2511,69 @@ RooFitResult *InvMassFitter2D::fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPd
   const char* sgnName = sgnPdf->GetName();
   const char* bkgName = bkgPdf->GetName();
 
-  plotFitResults(dataset, &massVar, &model, fitResult, sgnName, bkgName, title.c_str(), plotFilename.c_str());
+  if (plotFilename.find("Corr") != std::string::npos) {
+    plotFitResults(dataset, &massVar, &modelCorr, fitResult, sgnName, bkgName, title.c_str(), plotFilename.c_str());
+  } else {
+    plotFitResults(dataset, &massVar, &model, fitResult, sgnName, bkgName, title.c_str(), plotFilename.c_str());
+  }
+
+  return fitResult;
+}
+
+RooFitResult *InvMassFitter2D::fitAndPlot1DCandidate(RooAbsPdf* sgnPdf, RooAbsPdf* bkgPdf, RooAbsPdf* reflPdf, RooRealVar& massVar, RooDataSet* dataset,
+                                            const std::string& candidateName, const std::string& plotFilename) {
+  // Define the number of signal and background events
+
+  RooRealVar nSgn(Form("nSgn%s", candidateName.c_str()),
+  Form("Number of signal events of %s", candidateName.c_str()),
+        100000, 0, 1e8);
+  RooFormulaVar *nRefl = new RooFormulaVar("nRefl", Form("reflected signal yield of %s", candidateName.c_str()), "@0 * @1", RooArgList(_reflOverSgn, nSgn));
+  RooRealVar nBkg(Form("nBkg%s", candidateName.c_str()),
+  Form("Number of background events of %s", candidateName.c_str()),
+    500000, 0, 1e8);
+
+  RooRealVar nSgnCorr(Form("nSgnCorr%s", candidateName.c_str()),
+    Form("Number of signal events of %s", candidateName.c_str()),
+        1e8, 0, 1e12);
+  RooRealVar nBkgCorr(Form("nBkgCorr%s", candidateName.c_str()),
+    Form("Number of background events of %s", candidateName.c_str()),
+        1e8, 0, 1e12);
+  RooFormulaVar *nReflCorr = new RooFormulaVar("nReflCorr", Form("reflected signal yield of %s", candidateName.c_str()), "@0 * @1", RooArgList(_reflOverSgn, nSgnCorr));
+
+  // Create the composite model
+  RooAddPdf model(Form("model%s", candidateName.c_str()),
+  Form("Signal + Background + Reflections of %s", candidateName.c_str()),
+    RooArgList(*sgnPdf, *bkgPdf, *reflPdf), RooArgList(nSgn, nBkg, *nRefl));
+  
+  RooAddPdf modelCorr(Form("modelCorr%s", candidateName.c_str()),
+  Form("Signal + Background + Reflections of %s", candidateName.c_str()),
+    RooArgList(*sgnPdf, *bkgPdf, *reflPdf), RooArgList(nSgnCorr, nBkgCorr, *nReflCorr));
+
+  // Fit the model to the data
+  RooFitResult* fitResult;
+  if (plotFilename.find("Corr") != std::string::npos) {
+    // The string contains "Corr"
+    fitResult =  modelCorr.fitTo(*dataset, Save(), RooFit::PrintLevel(-1));
+  } else {
+    fitResult =  model.fitTo(*dataset, Save(), RooFit::PrintLevel(-1));
+  }
+
+  fitResult->Print("v");
+  if (fitResult->status() != 0) {
+    std::cout << "Fit did not converge for " << candidateName << "!" << std::endl;
+  }
+
+  // Plot the fit results
+  std::string title = "Fit Result for " + candidateName;
+  const char* sgnName = sgnPdf->GetName();
+  const char* bkgName = bkgPdf->GetName();
+  const char* reflName = reflPdf->GetName();
+
+  if (plotFilename.find("Corr") != std::string::npos) {
+    plotFitResults(dataset, &massVar, &modelCorr, fitResult, sgnName, bkgName, reflName, title.c_str(), plotFilename.c_str());
+  } else {
+    plotFitResults(dataset, &massVar, &model, fitResult, sgnName, bkgName, reflName, title.c_str(), plotFilename.c_str());
+  }
 
   return fitResult;
 }
@@ -2656,39 +2605,12 @@ void InvMassFitter2D::setPrefitParameters(const RooArgList& prefitParams) {
         wsPar->setVal(par->getVal());
         std::cout << "Updated workspace parameter " << parName 
                   << " to " << wsPar->getVal() << std::endl;
-        if (baseName != "sigma" && parName != "mean") {
-          //wsPar->setConstant(kTRUE);
-        }
-    }
-  }
-}
-
-void InvMassFitter2D::setCorrectedParameters(const RooArgList& rawfitParams) {
-  RooArgSet workspaceVars = _workspace.allVars();
-  // Loop through all parameters and print their values
-  for (int i = 0; i < rawfitParams.getSize(); i++) {
-    RooRealVar* par = dynamic_cast<RooRealVar*>(rawfitParams.at(i));
-    if (!par) continue;  // Safety check
-
-    std::string parName = par->GetName();
-
-    // Add "Corr" suffix
-    std::string suffix = "Corr";
-    std::string corrName = parName + suffix;
-
-    std::cout << parName << " = " << par->getVal() 
-              << " ± " << par->getError() << std::endl;
-
-    // Check if the parameter exists in the workspace
-    RooRealVar* wsPar = dynamic_cast<RooRealVar*>(workspaceVars.find(corrName.c_str()));
-    if (wsPar) {
-        // Update the workspace variable with the fitted value
-        wsPar->setVal(par->getVal());
-        std::cout << "Updated workspace parameter " << parName 
-                  << " to " << wsPar->getVal() << std::endl;
-        if (parName == "sigma" || parName == "mean") {
-          wsPar->setConstant(kTRUE);
-        }
+        //if (baseName.find("Corr") == std::string::npos) {
+            if (baseName != "sigma" && baseName != "mean" && baseName != "sigmaCand2" && baseName != "meanCand2" &&
+              baseName != "sigmaCorr" && baseName != "meanCorr" && baseName != "sigmaCand2Corr" && baseName != "meanCand2Corr") {
+                wsPar->setConstant(kTRUE);
+            }
+        //}
     }
   }
 }

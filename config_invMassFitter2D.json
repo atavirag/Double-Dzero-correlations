@@ -1,0 +1,46 @@
+{
+    "verbose": true,
+
+    "files": {
+        "_oldAO2Ds": "~/MyMacros/Correlations_v2/triggered_data/AO2D_Data_Full2024.root",
+        "_BDTsthatWorkForSure": "~/MyMacros/corelations_with_phi/AO2D_fullData_oldBDTs.root",
+
+        "AO2D_data": "~/MyMacros/Double-Dzero-correlations/MLswapped/AO2D_long_data.root",
+        "AnalysisResults_data": "~/MyMacros/Correlations_v2/triggered_data/AnalysisResults_Data_Full2024.root",
+        "singleD0_fitResults": "/home/andrea/MyMacros/Correlations_github/rawYields_LHC23_pass4.root",
+        "efficiency_map": "~/MyMacros/Double-Dzero-correlations/Eff_times_Acc_Map_weighted_latest_PR.root",
+        "integrated_efficiency": "/home/andrea/MyMacros/Common/AccEffPreselD0ToKPi_bothBDTs_no_ambiguous_pt_integrated.root"
+    },
+
+    "functions": {
+        "_bkgFuncs": "Available options: *expo*, poly0, poly1, poly2, expPoly1, expPoly2, expPoly1, exp2",
+        "bkgFunc": "expo",
+        "_sgnFuncs": "Available options: *gaus*, CB",
+        "sgnFunc": "gaus",
+        "_reflFuncs": "Available options: *gaus*, doubleGaus",
+        "reflFunc": "gaus"
+    },
+
+    "ranges": {
+        "_defaultMass": [[1.74, 2.05]],
+        "mass": [[1.74, 2.05]],
+
+        "_defaultPtSingle": [[1.0, 24.0]],
+        "ptSingle": [[1.0, 24.0]],
+
+        "_defaultPtPair": [[0.0, 100.0]],
+        "ptPair": [[0.0, 100.0]]
+    },
+
+    "options": {
+        "doFit": true,
+        "analyseKinematics": false,
+
+        "_removeAmbiguous": "its size should match the number of single pt ranges",
+        "removeAmbiguous": [false, true, true, true, false, false, false],
+
+        "_fitReflections": "its size should match the number of single pt ranges",
+        "fitReflections": [true, false, false, false, false, false, false],
+        "isMC": false
+    }
+}
